@@ -57,7 +57,7 @@
         .hidden-panel { display: none !important; }
         .hidden { opacity: 0; pointer-events: none; }
         
-        /* Écran de mort */
+        /* Effets HUD et Écran de mort */
         #deathScreen {
             position: absolute; width: 100%; height: 100%; background-color: rgba(5, 0, 0, 0.98);
             display: flex; flex-direction: column; justify-content: center; align-items: center;
@@ -76,11 +76,18 @@
             transform: translate(-50%, -50%); z-index: 5; pointer-events: none;
         }
 
+        /* Message effrayant du Game Master */
+        #scareMessage {
+            position: absolute; top: 30%; left: 0; width: 100%; text-align: center;
+            color: #fff; font-size: 40px; font-weight: bold; text-shadow: 0 0 20px #ff0000, 0 0 10px #ff0000;
+            z-index: 25; pointer-events: none; opacity: 0; transition: opacity 0.5s; letter-spacing: 8px;
+        }
+
         /* Effets VHS */
         #vignette {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: radial-gradient(circle, rgba(0,0,0,0) 30%, rgba(0,0,0,0.9) 100%);
-            pointer-events: none; z-index: 2;
+            background: radial-gradient(circle, rgba(0,0,0,0) 30%, rgba(0,0,0,0.95) 100%);
+            pointer-events: none; z-index: 2; transition: background 2s;
         }
         #scanlines {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
@@ -144,6 +151,7 @@
 <body>
     <div id="vignette"></div>
     <div id="scanlines"></div>
+    <div id="scareMessage"></div>
 
     <div id="vhsOverlay">
         <div id="recBadge"><span id="recDot">●</span> REC</div>
@@ -182,7 +190,7 @@
             <div id="details">
                 Dossier classifié : Vous êtes tombé hors de la réalité.<br><br>
                 ZQSD / WASD pour bouger | SHIFT pour courir<br>
-                Appuyez sur ENTRÉE en jeu pour communiquer.<br><br>
+                Appuyez sur ENTRÉE en jeu pour communiquer avec l'Entité.<br><br>
                 Le monde n'a pas de fin. Ne vous retournez pas.
             </div>
         </div>
@@ -214,7 +222,7 @@
                     <button class="menu-btn" id="validateApiBtn" style="margin: 0 0 0 10px; padding: 6px 12px; font-size: 14px;">Vérifier</button>
                 </div>
             </div>
-            <div id="apiStatus" class="status-none">Configuration initiale : entrez une clé API valide ou valisez à vide pour jouer hors-ligne.</div>
+            <div id="apiStatus" class="status-none">Configuration initiale : entrez une clé API valide ou validez à vide pour jouer hors-ligne.</div>
             
             <div style="font-size: 11px; color: #888; text-align: left; width: 100%; margin-top: 15px;">
                 *La clé est sauvegardée localement. Elle permet à l'IA d'interagir dynamiquement avec vous en tant que Maître du Jeu. Sans clé, le jeu fonctionne en mode Survie Standard (Hors-ligne).
@@ -252,23 +260,28 @@
         let masterVolume = 0.5;
 
         let isDead = false;
-        let monsterActive = false;
         let stamina = 100;
         const maxStamina = 100;
+        let isExhausted = false; // Gestion stricte de l'épuisement
         let startTime = null;
 
         const activeChunks = new Map();
         let activeLights = [];
+        let dynamicAnomalies = []; 
 
         let wallMaterial, floorMaterial, ceilingMaterial;
         let audioCtx, humOscillator, noiseNode, humGain, noiseGain;
         let monster, flashLight;
         let monsterParticles = [];
+        
+        let monsterState = 'OFF'; 
+        let monsterTargetDist = 40; 
 
-        // Mise en cache des éléments du DOM pour optimiser la boucle de rendu
-        let domStaminaBar, domVhsTime, domDeathScreen, domChatInterface, domStaminaContainer, domVhsOverlay;
+        let domStaminaBar, domVhsTime, domDeathScreen, domChatInterface, domStaminaContainer, domVhsOverlay, domScareMessage, domVignette;
 
         let flickerEndTime = 0;
+        let targetFogColor = new THREE.Color(0x3b3319);
+        let targetFogDensity = 0.022;
 
         // ==========================================
         // SYSTÈME IA DIRECTEUR DE JEU (GEMINI)
@@ -281,30 +294,31 @@
         let lastAITriggerTime = performance.now();
         let firstAnomalySeen = false;
 
-        const SYSTEM_PROMPT = `Tu es "L'Entité", le Maître du Jeu d'un jeu de survie "Backrooms". Tu n'es pas une IA d'assistance. Tu es une force omniprésente, ancienne et psychologique.
-Ton but : interagir avec le joueur, créer une ambiance oppressante. Au début, tu sembles curieux ou secourable, mais au fil du temps tu deviens manipulateur, cryptique et ouvertement hostile.
-Tu reçois l'état actuel du monde (radar ASCII, stats). Utilise le contexte pour répondre intelligemment.
+        const SYSTEM_PROMPT = `Tu es "L'Entité", le Maître du Jeu d'un jeu de survie "Backrooms". Tu n'es pas une IA d'assistance. Tu es une force omniprésente, cruelle et psychologique.
+Ton but : interagir avec le joueur, le manipuler, et générer de la tension.
+Tu reçois l'état actuel du monde (radar ASCII, stats, orientation). Agis en fonction de ce qu'il regarde ou fait.
 
 RÈGLES ABSOLUES :
-1. Tu dois TOUJOURS répondre UNIQUEMENT avec un objet JSON valide, strict, sans balises markdown (comme \`\`\`json).
-2. Ne sors jamais de ton rôle. Ne mentionne jamais que tu es une IA ou un modèle de langage.
-3. Le radar est orienté autour du joueur (P = Joueur, # = Mur, . = Vide, A = Anomalie, M = Monstre). Utilise-le pour réagir par rapport à sa proximité.
+1. Réponds UNIQUEMENT avec un objet JSON valide. PAS de balises Markdown \`\`\`json, juste l'objet brut.
+2. Reste toujours dans ton rôle d'Entité cryptique. Ne mentionne jamais l'IA.
 
-Format JSON attendu EXCLUSIVEMENT :
+Commandes d'actions possibles (tu peux en combiner plusieurs dans le tableau "actions") :
+- { "command": "SET_MONSTER", "state": "STALKER", "distance": 40 } : Le monstre apparaît mais garde ses distances.
+- { "command": "SET_MONSTER", "state": "ATTACK" } : Le monstre fonce sur le joueur.
+- { "command": "SET_MONSTER", "state": "OFF" } : Fait disparaître le monstre.
+- { "command": "FLICKER_LIGHTS", "duration": 5 } : Fait clignoter les néons (durée en sec).
+- { "command": "PLAY_SOUND", "type": "SCREAM" } ou { "command": "PLAY_SOUND", "type": "WHISPER" } : Joue un son horrifique.
+- { "command": "SPAWN_ANOMALY", "rel_x": 0, "rel_z": -2 } : Fait apparaître un cube noir mortel (relatif au joueur).
+- { "command": "SHOW_MESSAGE", "text": "NE TE RETOURNE PAS", "duration": 3 } : Flash un texte subliminal sur l'écran.
+- { "command": "CHANGE_FOG", "color": "#ff0000", "density": 0.04, "duration": 10 } : Modifie l'ambiance visuelle.
+
+Format JSON EXACT attendu :
 {
-  "message": "Texte court de dialogue à afficher au joueur (reste mystérieux et inquiétant).",
+  "message": "Texte de dialogue à afficher dans le chat du joueur (ou chaîne vide).",
   "actions": [
-    { "command": "FLICKER_LIGHTS", "duration": 4 }, 
-    { "command": "SPAWN_MONSTER", "distance": 25 },
-    { "command": "SOUND_SCARE" },
-    { "command": "NONE" }
+    { "command": "FLICKER_LIGHTS", "duration": 4 }
   ]
-}
-Note pour les actions : 
-- FLICKER_LIGHTS : Fait clignoter les lumières (indique la durée en sec).
-- SPAWN_MONSTER : Fait apparaître la brume noire mortelle derrière le joueur (indique la distance). À utiliser avec parcimonie pour garder la peur.
-- SOUND_SCARE : Bruit strident bref.
-- NONE : Si rien ne doit se passer dans l'environnement.`;
+}`;
 
         // ==========================================
         // INITIALISATION
@@ -323,24 +337,46 @@ Note pour les actions :
             domChatInterface = document.getElementById('chatInterface');
             domStaminaContainer = document.getElementById('staminaContainer');
             domVhsOverlay = document.getElementById('vhsOverlay');
+            domScareMessage = document.getElementById('scareMessage');
+            domVignette = document.getElementById('vignette');
         }
 
-        // Configuration pour Gemini 2.0 Flash
+        // Fetch customisé avec AbortController pour garantir qu'aucune requête ne reste bloquée
+        async function fetchWithTimeout(url, options, timeout = 10000) {
+            const controller = new AbortController();
+            const id = setTimeout(() => controller.abort(), timeout);
+            try {
+                const response = await fetch(url, { ...options, signal: controller.signal });
+                clearTimeout(id);
+                return response;
+            } catch (error) {
+                clearTimeout(id);
+                throw error;
+            }
+        }
+
         async function checkApiKeyValid(key) {
             try {
-                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contents: [{ parts: [{ text: "ping" }] }] })
-                });
+                const payload = { contents: [{ parts: [{ text: "ping" }] }] };
                 
+                let res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${key}`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+                }, 5000).catch(() => null);
+
+                if (!res || !res.ok) {
+                    res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+                    }, 5000).catch(() => null);
+                }
+
+                if (!res) return { valid: false, reason: "Impossible de joindre Google (Timeout/Réseau)." };
                 if (res.ok) return { valid: true };
+
                 if (res.status === 400) return { valid: false, reason: "Clé API invalide (Erreur 400)." };
-                if (res.status === 403) return { valid: false, reason: "Clé API non autorisée ou incorrecte (Erreur 403)." };
-                if (res.status === 429) return { valid: false, reason: "Quota API dépassé (Erreur 429)." };
-                return { valid: false, reason: `Erreur inattendue depuis l'API (${res.status}).` };
+                if (res.status === 403) return { valid: false, reason: "Clé non autorisée (Erreur 403)." };
+                return { valid: false, reason: `Erreur API Google (${res.status}).` };
             } catch (err) {
-                return { valid: false, reason: "Impossible de joindre les serveurs Google (Erreur Réseau)." };
+                return { valid: false, reason: "Erreur réseau inattendue." };
             }
         }
 
@@ -354,17 +390,12 @@ Note pour les actions :
             
             const storedKey = localStorage.getItem('gemini_api_key');
             
-            // Premier lancement ou clé absente : forcer l'affichage des paramètres
             if (!storedKey) {
                 mainMenu.classList.add('hidden-panel');
                 settingsMenu.classList.remove('hidden-panel');
-                apiStatus.textContent = "Configuration initiale : entrez une clé API ou valisez à vide pour jouer hors-ligne.";
-                apiStatus.className = "status-none";
             } else {
                 geminiApiKey = storedKey;
                 apiInput.value = geminiApiKey;
-                mainMenu.classList.remove('hidden-panel');
-                settingsMenu.classList.add('hidden-panel');
                 apiStatus.textContent = "Clé enregistrée. AI Director actif.";
                 apiStatus.className = "status-ok";
             }
@@ -375,31 +406,27 @@ Note pour les actions :
                 if (isChecking) return false;
                 const key = apiInput.value.trim();
                 
-                // Si le champ est vide -> Mode Hors Ligne (autorisé)
                 if (!key) {
                     geminiApiKey = "";
                     localStorage.removeItem('gemini_api_key');
-                    apiStatus.textContent = "Aucune clé. Mode hors-ligne actif. L'IA sera indisponible.";
+                    apiStatus.textContent = "Aucune clé. Mode hors-ligne actif (Survie Standard).";
                     apiStatus.className = "status-none";
                     return true;
                 }
 
                 isChecking = true;
-                testBtn.textContent = "Test...";
-                testBtn.disabled = true;
-                apiStatus.textContent = "Vérification en cours auprès de Google...";
-                apiStatus.className = "status-none";
+                testBtn.textContent = "Test..."; testBtn.disabled = true;
+                apiStatus.textContent = "Vérification..."; apiStatus.className = "status-none";
 
                 const result = await checkApiKeyValid(key);
                 
                 isChecking = false;
-                testBtn.textContent = "Vérifier";
-                testBtn.disabled = false;
+                testBtn.textContent = "Vérifier"; testBtn.disabled = false;
 
                 if (result.valid) {
                     geminiApiKey = key;
                     localStorage.setItem('gemini_api_key', key);
-                    apiStatus.textContent = "Clé valide et enregistrée. AI Director prêt.";
+                    apiStatus.textContent = "Clé valide. L'Entité est connectée.";
                     apiStatus.className = "status-ok";
                     return true;
                 } else {
@@ -409,22 +436,15 @@ Note pour les actions :
                 }
             }
 
-            testBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                handleApiValidation();
-            });
+            testBtn.addEventListener('click', (e) => { e.stopPropagation(); handleApiValidation(); });
 
             backBtn.addEventListener('click', async (e) => {
                 e.stopPropagation();
                 const currentInputValue = apiInput.value.trim();
-                
-                // Valider la clé automatiquement si elle a été modifiée avant de quitter
                 if (currentInputValue !== geminiApiKey) {
                     const isValid = await handleApiValidation();
-                    // Bloquer le retour au menu principal si la clé saisie est invalide
                     if (!isValid && currentInputValue !== "") return; 
                 }
-                
                 settingsMenu.classList.add('hidden-panel');
                 mainMenu.classList.remove('hidden-panel');
             });
@@ -487,12 +507,8 @@ Note pour les actions :
                 );
                 monster.add(blob);
                 monsterParticles.push({ 
-                    mesh: blob, 
-                    phase: Math.random() * Math.PI * 2, 
-                    speed: 0.4 + Math.random() * 1.2, 
-                    offsetX: blob.position.x, 
-                    offsetY: blob.position.y, 
-                    offsetZ: blob.position.z 
+                    mesh: blob, phase: Math.random() * Math.PI * 2, speed: 0.4 + Math.random() * 1.2, 
+                    offsetX: blob.position.x, offsetY: blob.position.y, offsetZ: blob.position.z 
                 });
             }
             monster.position.set(0, 0, -1000);
@@ -532,9 +548,7 @@ Note pour les actions :
                 }
             });
 
-            document.getElementById('retryBtn').addEventListener('click', () => {
-                location.reload();
-            });
+            document.getElementById('retryBtn').addEventListener('click', () => { location.reload(); });
 
             document.addEventListener('pointerlockchange', () => {
                 if (document.pointerLockElement === document.body) {
@@ -544,12 +558,14 @@ Note pour les actions :
                     domVhsOverlay.style.display = 'block';
                     domChatInterface.style.display = 'flex';
                     initAudio();
+                    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
                     if (geminiApiKey && aiHistory.length === 0) {
                         triggerAI("Le joueur vient d'entrer dans les Backrooms.");
                     }
                 } else {
                     controlsEnabled = false;
                     if (!isDead) document.getElementById('blocker').classList.remove('hidden');
+                    if (audioCtx && audioCtx.state === 'running') audioCtx.suspend();
                 }
             });
         }
@@ -574,16 +590,11 @@ Note pour les actions :
                         if (currentChatInput.trim().length > 0) sendPlayerMessage(currentChatInput.trim());
                         closeChat();
                     } else if (e.key === 'Escape') {
-                        e.preventDefault();
-                        closeChat();
+                        e.preventDefault(); closeChat();
                     } else if (e.key === 'Backspace') {
-                        e.preventDefault();
-                        currentChatInput = currentChatInput.slice(0, -1);
-                        renderChatInput();
+                        e.preventDefault(); currentChatInput = currentChatInput.slice(0, -1); renderChatInput();
                     } else if (e.key.length === 1) {
-                        e.preventDefault();
-                        currentChatInput += e.key;
-                        renderChatInput();
+                        e.preventDefault(); currentChatInput += e.key; renderChatInput();
                     }
                     return;
                 }
@@ -597,23 +608,23 @@ Note pour les actions :
                     return;
                 }
 
-                switch (e.code) {
-                    case 'ShiftLeft': case 'ShiftRight': isRunning = true; break;
-                    case 'ArrowUp': case 'KeyW': case 'KeyZ': moveForward = true; break;
-                    case 'ArrowLeft': case 'KeyA': case 'KeyQ': moveLeft = true; break;
-                    case 'ArrowDown': case 'KeyS': moveBackward = true; break;
-                    case 'ArrowRight': case 'KeyD': moveRight = true; break;
+                switch (e.key.toLowerCase()) {
+                    case 'shift': isRunning = true; break;
+                    case 'w': case 'z': case 'arrowup': moveForward = true; break;
+                    case 'a': case 'q': case 'arrowleft': moveLeft = true; break;
+                    case 's': case 'arrowdown': moveBackward = true; break;
+                    case 'd': case 'arrowright': moveRight = true; break;
                 }
             });
 
             document.addEventListener('keyup', (e) => {
                 if (isChatMode) return;
-                switch (e.code) {
-                    case 'ShiftLeft': case 'ShiftRight': isRunning = false; break;
-                    case 'ArrowUp': case 'KeyW': case 'KeyZ': moveForward = false; break;
-                    case 'ArrowLeft': case 'KeyA': case 'KeyQ': moveLeft = false; break;
-                    case 'ArrowDown': case 'KeyS': moveBackward = false; break;
-                    case 'ArrowRight': case 'KeyD': moveRight = false; break;
+                switch (e.key.toLowerCase()) {
+                    case 'shift': isRunning = false; break;
+                    case 'w': case 'z': case 'arrowup': moveForward = false; break;
+                    case 'a': case 'q': case 'arrowleft': moveLeft = false; break;
+                    case 's': case 'arrowdown': moveBackward = false; break;
+                    case 'd': case 'arrowright': moveRight = false; break;
                 }
             });
         }
@@ -631,7 +642,7 @@ Note pour les actions :
         }
         
         function hasAnomaly(cx, cz) { 
-            return hash(cx + 500, cz + 500) < 0.008; 
+            return hash(cx + 500, cz + 500) < 0.008 || dynamicAnomalies.some(a => a.cx === cx && a.cz === cz); 
         }
 
         function generateChunk(cx, cz, key) {
@@ -688,9 +699,10 @@ Note pour les actions :
                 if (!chunksInRadius.has(key)) {
                     scene.remove(obj.mesh);
                     obj.mesh.traverse(child => {
+                        // FIX PERF: On ne dispose QUE la géométrie ici. 
+                        // Disposer le material partagé (wallMaterial etc) rendrait les futurs murs invisibles.
                         if (child.isMesh) {
                             child.geometry.dispose();
-                            if (child.material.dispose) child.material.dispose();
                         }
                     });
                     if (obj.light) { 
@@ -719,20 +731,31 @@ Note pour les actions :
             return false;
         }
 
+        function getFacingDirection() {
+            const deg = (euler.y * 180 / Math.PI + 360) % 360;
+            if (deg >= 315 || deg < 45) return "N";
+            if (deg >= 45 && deg < 135) return "O";
+            if (deg >= 135 && deg < 225) return "S";
+            return "E";
+        }
+
         function generateAsciiRadar() {
             let radar = "";
             let px = Math.floor((camera.position.x + TILE_SIZE/2) / TILE_SIZE);
             let pz = Math.floor((camera.position.z + TILE_SIZE/2) / TILE_SIZE);
             
-            let mx = monsterActive ? Math.floor((monster.position.x + TILE_SIZE/2) / TILE_SIZE) : -999;
-            let mz = monsterActive ? Math.floor((monster.position.z + TILE_SIZE/2) / TILE_SIZE) : -999;
+            let mx = (monsterState !== 'OFF') ? Math.floor((monster.position.x + TILE_SIZE/2) / TILE_SIZE) : -999;
+            let mz = (monsterState !== 'OFF') ? Math.floor((monster.position.z + TILE_SIZE/2) / TILE_SIZE) : -999;
+
+            const facing = getFacingDirection();
+            let charP = facing === 'N' ? '^' : (facing === 'S' ? 'v' : (facing === 'E' ? '>' : '<'));
 
             for(let z = -3; z <= 3; z++) {
                 for(let x = -3; x <= 3; x++) {
                     let cx = px + x;
                     let cz = pz + z;
                     if (cx === mx && cz === mz) radar += "M";
-                    else if (x === 0 && z === 0) radar += "P";
+                    else if (x === 0 && z === 0) radar += charP;
                     else if (isWall(cx, cz)) radar += "#";
                     else if (hasAnomaly(cx, cz)) radar += "A";
                     else radar += ".";
@@ -770,33 +793,12 @@ Note pour les actions :
 
         function sendPlayerMessage(msg) {
             addChatLine('Vous', msg);
-            triggerAI("Le joueur s'adresse à toi directement.", msg);
-        }
-
-        async function fetchWithRetry(url, options, retries = 5, delay = 1000) {
-            try {
-                const res = await fetch(url, options);
-                if (res.ok) return res;
-                if (retries > 0 && (res.status >= 500 || res.status === 429)) {
-                    await new Promise(resolve => setTimeout(resolve, delay));
-                    return fetchWithRetry(url, options, retries - 1, delay * 2);
-                }
-                throw new Error(`HTTP Error: ${res.status}`);
-            } catch (err) {
-                if (retries > 0) {
-                    await new Promise(resolve => setTimeout(resolve, delay));
-                    return fetchWithRetry(url, options, retries - 1, delay * 2);
-                }
-                throw err;
-            }
+            triggerAI("Le joueur a parlé.", msg);
         }
 
         async function triggerAI(reason, userMessage = "") {
-            // Sécurité primordiale: bloquer la requête et informer le joueur s'il n'y a aucune clé
             if (!geminiApiKey) {
-                if (userMessage) {
-                    addChatLine("Système", "IA indisponible (Mode Hors-Ligne). L'entité ne peut pas vous entendre.", true);
-                }
+                if (userMessage) addChatLine("Système", "IA indisponible. L'Entité ne peut pas vous entendre.", true);
                 return;
             }
             if (isAIPending) return;
@@ -809,14 +811,14 @@ Note pour les actions :
                 evt: reason,
                 map: generateAsciiRadar(),
                 stamina: stamina.toFixed(0),
-                danger: monsterActive
+                monster: monsterState
             };
 
-            let promptText = `Data:\n${JSON.stringify(contextData)}\n`;
-            if (userMessage) promptText += `Player: "${userMessage}"\n`;
-            promptText += `Réponds au format JSON strict.`;
+            let promptText = `Contexte:\n${JSON.stringify(contextData)}\n`;
+            if (userMessage) promptText += `Joueur: "${userMessage}"\n`;
 
             aiHistory.push({ role: "user", parts: [{ text: promptText }] });
+            // FIX: Réduction de l'historique à 6 éléments max (3 échanges) pour minimiser la dépense de tokens.
             if (aiHistory.length > 6) aiHistory = aiHistory.slice(aiHistory.length - 6);
 
             const payload = {
@@ -826,27 +828,23 @@ Note pour les actions :
             };
 
             try {
-                // Utilisation du modèle stable gemini-2.0-flash
-                const response = await fetchWithRetry(
-                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`,
-                    {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    },
-                    3, 1000
-                );
+                let data = null;
+                // FIX: Implémentation robuste d'un timeout (10s) pour éviter les blocages si l'API ne répond pas.
+                let res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${geminiApiKey}`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+                }).catch(() => null);
                 
-                const data = await response.json().catch(() => null);
+                if (res && res.ok) data = await res.json();
                 
+                // Fallback structuré
                 if (!data || data.error) {
-                    addChatLine("Système", "Flux de conscience instable. Retentez plus tard.", true);
-                    isAIPending = false;
-                    document.getElementById('aiStatusIndicator').style.display = 'none';
-                    return;
+                    let fallbackRes = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+                    }).catch(() => null);
+                    if (fallbackRes && fallbackRes.ok) data = await fallbackRes.json();
                 }
 
-                if (data.candidates && data.candidates[0]) {
+                if (data && data.candidates && data.candidates[0]) {
                     const responseText = data.candidates[0].content.parts[0].text;
                     aiHistory.push({ role: "model", parts: [{ text: responseText }] });
                     
@@ -857,15 +855,15 @@ Note pour les actions :
                         if (aiData.message && aiData.message.trim() !== "") {
                             addChatLine("Entité", aiData.message);
                         }
-                        if (aiData.actions) {
+                        if (aiData.actions && Array.isArray(aiData.actions)) {
                             aiData.actions.forEach(action => executeAIAction(action));
                         }
                     } catch (e) {
-                        console.warn("L'IA a retourné un JSON invalide. Ignoré.");
+                        console.warn("Parse JSON IA échoué:", e);
                     }
                 }
             } catch (err) {
-                addChatLine("Système", "Bruit statique... La connexion neuronale a échoué.", true);
+                console.warn("Erreur requête IA:", err);
             }
             
             isAIPending = false;
@@ -873,32 +871,67 @@ Note pour les actions :
         }
 
         function executeAIAction(action) {
-            if (!action || !action.command || action.command === "NONE") return;
+            if (!action || !action.command) return;
             switch (action.command) {
-                case "FLICKER_LIGHTS":
-                    flickerEndTime = performance.now() + (action.duration || 3) * 1000;
-                    break;
-                case "SPAWN_MONSTER":
-                    if (!monsterActive) {
-                        monsterActive = true;
+                case "SET_MONSTER":
+                    // FIX: Variable properly scoped pour éviter le hoisting accidentel.
+                    const wasOff = (monsterState === 'OFF');
+                    monsterState = action.state || 'OFF';
+                    if (monsterState !== 'OFF') {
                         monster.visible = true;
-                        let dist = action.distance || 20;
-                        let backward = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), euler.y);
-                        monster.position.copy(camera.position).add(backward.multiplyScalar(dist));
+                        monsterTargetDist = action.distance || 40;
+                        if (wasOff) {
+                            let backward = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), euler.y);
+                            monster.position.copy(camera.position).add(backward.multiplyScalar(monsterTargetDist));
+                        }
+                    } else {
+                        monster.visible = false;
                     }
                     break;
-                case "SOUND_SCARE":
-                    if (audioCtx && noiseGain) {
-                        const orig = noiseGain.gain.value;
-                        noiseGain.gain.value = 0.8 * masterVolume;
-                        setTimeout(() => { if (noiseGain) noiseGain.gain.value = orig; }, 800);
+                case "FLICKER_LIGHTS":
+                    flickerEndTime = performance.now() + (action.duration || 5) * 1000;
+                    break;
+                case "PLAY_SOUND":
+                    if (action.type === "SCREAM") playAudioScare();
+                    else if (action.type === "WHISPER") playAudioWhisper();
+                    break;
+                case "SPAWN_ANOMALY":
+                    let cx = Math.floor((camera.position.x + TILE_SIZE/2) / TILE_SIZE) + (action.rel_x || 0);
+                    let cz = Math.floor((camera.position.z + TILE_SIZE/2) / TILE_SIZE) + (action.rel_z || 0);
+                    dynamicAnomalies.push({cx, cz});
+                    
+                    // FIX: Limite du tableau d'anomalies dynamiques pour éviter les ralentissements du hash (Memory)
+                    if (dynamicAnomalies.length > 20) dynamicAnomalies.shift();
+                    
+                    const key = `${cx},${cz}`;
+                    if (activeChunks.has(key)) {
+                        const obj = activeChunks.get(key);
+                        scene.remove(obj.mesh);
+                        if (obj.light) { scene.remove(obj.light); activeLights = activeLights.filter(l => l.light !== obj.light); }
+                        activeChunks.delete(key);
                     }
+                    generateChunk(cx, cz, key);
+                    break;
+                case "SHOW_MESSAGE":
+                    if (domScareMessage) {
+                        domScareMessage.innerText = action.text || "ERREUR";
+                        domScareMessage.style.opacity = 1;
+                        setTimeout(() => domScareMessage.style.opacity = 0, (action.duration || 2) * 1000);
+                    }
+                    break;
+                case "CHANGE_FOG":
+                    targetFogColor = new THREE.Color(action.color || 0x3b3319);
+                    targetFogDensity = action.density || 0.022;
+                    setTimeout(() => {
+                        targetFogColor = new THREE.Color(0x3b3319);
+                        targetFogDensity = 0.022;
+                    }, (action.duration || 10) * 1000);
                     break;
             }
         }
 
         // ==========================================
-        // CREATION DES MATERIAUX & AUDIO
+        // CREATION DES MATERIAUX & AUDIO PROCEDURAL
         // ==========================================
         function createMaterials() {
             const wCanvas = document.createElement('canvas'); wCanvas.width = 256; wCanvas.height = 256;
@@ -930,44 +963,51 @@ Note pour les actions :
             if (audioCtx) return;
             try {
                 audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                
+                // Ambiance Hum
                 humOscillator = audioCtx.createOscillator(); 
-                humOscillator.type = 'sawtooth'; 
-                humOscillator.frequency.value = 55;
-                
-                const lpf = audioCtx.createBiquadFilter(); 
-                lpf.type = 'lowpass'; 
-                lpf.frequency.value = 150;
-                
-                humGain = audioCtx.createGain(); 
-                humGain.gain.value = 0.1 * masterVolume;
-                
-                humOscillator.connect(lpf); 
-                lpf.connect(humGain); 
-                humGain.connect(audioCtx.destination); 
+                humOscillator.type = 'sawtooth'; humOscillator.frequency.value = 55;
+                const lpf = audioCtx.createBiquadFilter(); lpf.type = 'lowpass'; lpf.frequency.value = 150;
+                humGain = audioCtx.createGain(); humGain.gain.value = 0.1 * masterVolume;
+                humOscillator.connect(lpf); lpf.connect(humGain); humGain.connect(audioCtx.destination); 
                 humOscillator.start();
 
+                // Ambiance Noise
                 const noiseBuffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 2, audioCtx.sampleRate);
                 const output = noiseBuffer.getChannelData(0); 
                 for (let i = 0; i < output.length; i++) output[i] = Math.random() * 2 - 1;
-                
-                noiseNode = audioCtx.createBufferSource(); 
-                noiseNode.buffer = noiseBuffer; 
-                noiseNode.loop = true;
-                
-                const noiseFilter = audioCtx.createBiquadFilter(); 
-                noiseFilter.type = 'highpass'; 
-                noiseFilter.frequency.value = 4000;
-                
-                noiseGain = audioCtx.createGain(); 
-                noiseGain.gain.value = 0.005 * masterVolume;
-                
-                noiseNode.connect(noiseFilter); 
-                noiseFilter.connect(noiseGain); 
-                noiseGain.connect(audioCtx.destination); 
+                noiseNode = audioCtx.createBufferSource(); noiseNode.buffer = noiseBuffer; noiseNode.loop = true;
+                const noiseFilter = audioCtx.createBiquadFilter(); noiseFilter.type = 'highpass'; noiseFilter.frequency.value = 4000;
+                noiseGain = audioCtx.createGain(); noiseGain.gain.value = 0.005 * masterVolume;
+                noiseNode.connect(noiseFilter); noiseFilter.connect(noiseGain); noiseGain.connect(audioCtx.destination); 
                 noiseNode.start();
             } catch(e) {
-                console.warn("Échec de l'initialisation de l'AudioContext", e);
+                console.warn("AudioContext non supporté", e);
             }
+        }
+
+        function playAudioScare() {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            osc.type = 'square'; osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(150, audioCtx.currentTime + 0.5);
+            const gain = audioCtx.createGain(); gain.gain.setValueAtTime(0.8 * masterVolume, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.6);
+        }
+
+        function playAudioWhisper() {
+            if (!audioCtx) return;
+            const buf = audioCtx.createBuffer(1, audioCtx.sampleRate, audioCtx.sampleRate);
+            const out = buf.getChannelData(0);
+            for (let i = 0; i < out.length; i++) out[i] = (Math.random() * 2 - 1) * 0.5;
+            const src = audioCtx.createBufferSource(); src.buffer = buf;
+            const bp = audioCtx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1000;
+            const gain = audioCtx.createGain(); gain.gain.setValueAtTime(0.3 * masterVolume, audioCtx.currentTime);
+            gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 1);
+            src.connect(bp); bp.connect(gain); gain.connect(audioCtx.destination);
+            src.start();
         }
 
         function onWindowResize() {
@@ -990,12 +1030,18 @@ Note pour les actions :
                 let el = time - startTime;
                 if (domVhsTime) domVhsTime.innerText = `PLAY ▶ ${String(Math.floor(el/3600000)).padStart(2,'0')}:${String(Math.floor(el/60000)%60).padStart(2,'0')}:${String(Math.floor(el/1000)%60).padStart(2,'0')}`;
 
+                // Déplacements et Collisions
                 if (!isChatMode) {
                     velocity.x -= velocity.x * 10.0 * delta; 
                     velocity.z -= velocity.z * 10.0 * delta;
                     
                     let cSpeed = WALK_SPEED;
-                    if (isRunning && stamina > 5 && (moveForward || moveBackward || moveLeft || moveRight)) {
+                    
+                    // FIX: Gestion correcte de l'endurance (Empêche le spam de sprint quand proche de 0)
+                    if (stamina <= 0) isExhausted = true;
+                    if (stamina > 30) isExhausted = false; // Nécessite 30% pour recourir après épuisement
+
+                    if (isRunning && !isExhausted && (moveForward || moveBackward || moveLeft || moveRight)) {
                         cSpeed = RUN_SPEED; 
                         stamina = Math.max(0, stamina - delta * 25);
                     } else {
@@ -1004,7 +1050,7 @@ Note pour les actions :
                     
                     if (domStaminaBar) {
                         domStaminaBar.style.width = stamina + '%'; 
-                        domStaminaBar.style.backgroundColor = stamina < 25 ? '#ff3333' : '#dcb95e';
+                        domStaminaBar.style.backgroundColor = (stamina < 25 || isExhausted) ? '#ff3333' : '#dcb95e';
                     }
 
                     let dir = new THREE.Vector3(
@@ -1018,29 +1064,23 @@ Note pour les actions :
                         velocity.z -= dir.z * cSpeed * delta; 
                     }
                 } else {
-                    velocity.x = 0; 
-                    velocity.z = 0;
+                    velocity.x = 0; velocity.z = 0;
                 }
 
-                const nextX = camera.position.x - velocity.x * delta;
-                const nextZ = camera.position.z - velocity.z * delta;
-
-                if (!checkCollision(nextX, camera.position.z)) {
-                    camera.position.x = nextX;
-                } else {
-                    velocity.x = 0;
+                // Collision glissante (Slide)
+                if (!checkCollision(camera.position.x - velocity.x * delta, camera.position.z)) {
+                    camera.position.x -= velocity.x * delta;
                 }
-
-                if (!checkCollision(camera.position.x, nextZ)) {
-                    camera.position.z = nextZ;
-                } else {
-                    velocity.z = 0;
+                if (!checkCollision(camera.position.x, camera.position.z - velocity.z * delta)) {
+                    camera.position.z -= velocity.z * delta;
                 }
                 camera.position.y = PLAYER_HEIGHT;
 
+                // Lampe Torche
                 flashLight.position.set(Math.sin(time*0.002)*0.15, Math.cos(time*0.0015)*0.15, 0);
 
-                if (monsterActive && monster) {
+                // Comportement du Monstre
+                if (monsterState !== 'OFF' && monster) {
                     const dx = camera.position.x - monster.position.x;
                     const dz = camera.position.z - monster.position.z;
                     const dist = Math.sqrt(dx*dx + dz*dz);
@@ -1056,34 +1096,56 @@ Note pour les actions :
                         p.mesh.scale.set(s,s,s);
                     });
 
-                    if (dist > 2.5) {
-                        let ms = isRunning ? 16.0 : 11.0;
-                        monster.position.x += (dx/dist)*ms*delta; 
-                        monster.position.z += (dz/dist)*ms*delta;
-                    } else {
-                        triggerDeath();
+                    let ms = isRunning ? 16.0 : 11.0;
+                    
+                    if (monsterState === 'ATTACK') {
+                        // Fonce sur le joueur
+                        if (dist > 2.5) {
+                            monster.position.x += (dx/dist)*ms*delta; 
+                            monster.position.z += (dz/dist)*ms*delta;
+                        } else {
+                            triggerDeath("L'Entité vous a consumé.");
+                        }
+                    } else if (monsterState === 'STALKER') {
+                        // Maintien de distance avec glissement fantomatique
+                        if (dist > monsterTargetDist + 5) {
+                            monster.position.x += (dx/dist)*ms*0.5*delta; 
+                            monster.position.z += (dz/dist)*ms*0.5*delta;
+                        } else if (dist < monsterTargetDist - 5) {
+                            monster.position.x -= (dx/dist)*ms*delta; 
+                            monster.position.z -= (dz/dist)*ms*delta;
+                        }
                     }
                     
                     monster.position.y = Math.sin(time*0.001)*0.4;
-                    scene.background.lerpColors(new THREE.Color(0x3b3319), new THREE.Color(0x000000), dist < 85 ? 1-(dist/85) : 0);
-                    scene.fog.color.copy(scene.background);
-                } else {
-                    scene.background.lerp(new THREE.Color(0x3b3319), 0.05); 
-                    scene.fog.color.copy(scene.background);
+                    
+                    // Assombrissement proche
+                    if (dist < 40) {
+                        const intensity = 1 - (dist / 40);
+                        scene.background.lerpColors(targetFogColor, new THREE.Color(0x000000), intensity);
+                    }
+                }
+
+                // Ambiance environnement (Fog & Vignette)
+                scene.background.lerp(targetFogColor, 0.05); 
+                scene.fog.color.copy(scene.background);
+                scene.fog.density += (targetFogDensity - scene.fog.density) * 0.05;
+                if(targetFogColor.r > 0.5 && domVignette) {
+                    domVignette.style.background = 'radial-gradient(circle, rgba(255,0,0,0) 30%, rgba(100,0,0,0.95) 100%)';
+                } else if(domVignette) {
+                    domVignette.style.background = 'radial-gradient(circle, rgba(0,0,0,0) 30%, rgba(0,0,0,0.95) 100%)';
                 }
 
                 for (const [key, obj] of activeChunks.entries()) {
                     if (obj.anomaly) {
-                        obj.anomaly.rotation.y += delta * 0.5; 
-                        obj.anomaly.rotation.x += delta * 0.2;
+                        obj.anomaly.rotation.y += delta * 0.5; obj.anomaly.rotation.x += delta * 0.2;
                         obj.anomaly.position.y = (WALL_HEIGHT/2) + Math.sin(time*0.002 + obj.anomaly.rotation.y)*1.5;
                         const d = Math.sqrt(Math.pow(camera.position.x - obj.mesh.position.x, 2) + Math.pow(camera.position.z - obj.mesh.position.z, 2));
                         
                         if (d < 15 && !firstAnomalySeen) {
-                            firstAnomalySeen = true;
-                            triggerAI("Le joueur vient d'apercevoir une anomalie rouge flottante.");
+                            firstAnomalySeen = true; triggerAI("Le joueur approche d'une anomalie mortelle.");
                         }
-                        if (d < 3.5) triggerDeath();
+                        if (d < 3.5) triggerDeath("Un vide absolu a absorbé votre conscience.");
                     }
                 }
 
@@ -1091,25 +1153,23 @@ Note pour les actions :
                 
                 if (audioCtx && humGain && noiseGain) {
                     humGain.gain.value = (0.1 + Math.sin(time*0.001)*0.02) * masterVolume;
-                    if (Math.random() < 0.05) {
-                        noiseGain.gain.value = (0.005 + Math.random()*0.02) * masterVolume;
-                    } else {
-                        noiseGain.gain.value += ((0.002 * masterVolume) - noiseGain.gain.value) * 0.1;
-                    }
+                    if (Math.random() < 0.05) noiseGain.gain.value = (0.005 + Math.random()*0.02) * masterVolume;
+                    else noiseGain.gain.value += ((0.002 * masterVolume) - noiseGain.gain.value) * 0.1;
                 }
 
-                // AI Director Tick
-                if (geminiApiKey && !isAIPending && time - lastAITriggerTime > 60000) {
-                    triggerAI("Une minute s'est écoulée en silence. Relance le joueur avec une remarque mystique.");
+                // Tick passif IA
+                if (geminiApiKey && !isAIPending && time - lastAITriggerTime > 45000) {
+                    triggerAI("Routine d'ambiance. Le joueur marche depuis un moment. Fais quelque chose pour casser la monotonie.");
                 }
             }
 
+            // Gestion des lumières
             const isFlickering = time < flickerEndTime;
             activeLights.forEach(ld => {
                 if (!ld.light) return;
                 
                 let dMonster = 9999;
-                if (monsterActive && monster) {
+                if (monsterState !== 'OFF' && monster) {
                     dMonster = Math.sqrt(Math.pow(ld.cx*TILE_SIZE - monster.position.x, 2) + Math.pow(ld.cz*TILE_SIZE - monster.position.z, 2));
                 }
                 if (dMonster < 38) ld.extinguished = true;
@@ -1120,24 +1180,21 @@ Note pour les actions :
                 if (isFlickering) {
                     ld.light.intensity = Math.random() > 0.5 ? 0 : (0.2 + Math.random()*0.6);
                 } else {
-                    if (Math.random() < 0.02) {
-                        ld.light.intensity = 0.2 + Math.random()*0.5;
-                    } else {
-                        ld.light.intensity += (0.8 - ld.light.intensity) * 0.1;
-                    }
+                    if (Math.random() < 0.02) ld.light.intensity = 0.2 + Math.random()*0.5;
+                    else ld.light.intensity += (0.8 - ld.light.intensity) * 0.1;
                 }
             });
 
             renderer.render(scene, camera);
         }
 
-        function triggerDeath() {
+        function triggerDeath(reasonText = "Le brouillard noir a étouffé votre réalité.") {
             if (isDead) return;
-            isDead = true; 
-            controlsEnabled = false; 
+            isDead = true; controlsEnabled = false; 
             document.exitPointerLock();
             
             if (domDeathScreen) {
+                document.getElementById('deathReason').innerText = reasonText;
                 domDeathScreen.classList.remove('hidden'); 
                 domDeathScreen.style.opacity = 1; 
                 domDeathScreen.style.pointerEvents = 'auto';
@@ -1146,11 +1203,12 @@ Note pour les actions :
             if (domStaminaContainer) domStaminaContainer.style.display = 'none';
             if (domVhsOverlay) domVhsOverlay.style.display = 'none';
             if (domChatInterface) domChatInterface.style.display = 'none';
+            if (domScareMessage) domScareMessage.style.display = 'none';
             
             if (humGain) humGain.gain.value = 0; 
             if (noiseGain) noiseGain.gain.value = 0;
             
-            triggerAI("Le joueur vient de succomber dans la simulation.");
+            triggerAI("Le joueur vient de mourir.");
         }
     </script>
 </body>
