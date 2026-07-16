@@ -211,7 +211,6 @@
     </div>
 
     <div id="blocker">
-        <!-- MODIFICATION: Enlèvement de la classe hidden-panel initiale pour éviter l'écran noir de départ -->
         <div id="mainMenu">
             <h1 id="gameTitle">ASYNC RESEARCH PROJECT</h1>
             <div id="subtitleText">Enregistrement de test - Secteur Infini</div>
@@ -301,7 +300,7 @@
         const activeChunks = new Map();
         let activeLights = [];
         let dynamicAnomalies = []; 
-        let dynamicJournals = []; // Nouveau : stocke les emplacements et infos des parchemins trouvés par terre
+        let dynamicJournals = []; 
 
         let wallMaterial, floorMaterial, ceilingMaterial, journalMaterial;
         let audioCtx, humOscillator, noiseNode, humGain, noiseGain;
@@ -335,7 +334,6 @@
             },
             
             save(sender, message) {
-                // Sauvegarde un enregistrement avec horodatage
                 const entry = {
                     sender,
                     message,
@@ -344,7 +342,6 @@
                 };
                 this.db.push(entry);
                 
-                // Garder les 100 dernières interactions majeures pour éviter de saturer le localStorage
                 if (this.db.length > 100) {
                     this.db.shift();
                 }
@@ -360,33 +357,27 @@
                 const clean = text.toLowerCase()
                                   .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"']/g," ")
                                   .split(/\s+/);
-                // Exclure les pronoms communs
                 const stopwords = ["je", "tu", "il", "nous", "vous", "ils", "le", "la", "les", "un", "une", "des", "et", "ou", "mais", "pour", "dans", "par", "sur", "avec", "que", "qui", "est", "pas", "plus", "dans"];
                 return [...new Set(clean.filter(w => w.length > 3 && !stopwords.includes(w)))];
             },
             
-            // Simule une recherche "vectorielle" par pertinence / mots-clés
             retrieveRelevant(currentInput, limit = 4) {
                 if (this.db.length === 0) return "";
                 const currentKeywords = this.extractKeywords(currentInput);
                 if (currentKeywords.length === 0) {
-                    // Si aucun mot clé n'est trouvé, renvoyer les 2 derniers éléments
                     return this.db.slice(-2).map(e => `[Il y a un moment] ${e.sender}: ${e.message}`).join("\n");
                 }
                 
-                // Calculer un score de pertinence pour chaque élément du passé
                 const scored = this.db.map(entry => {
                     let score = 0;
                     entry.keywords.forEach(kw => {
                         if (currentKeywords.includes(kw)) score += 1;
                     });
-                    // On pénalise légèrement le temps pour privilégier la ressemblance sémantique, mais on garde une trace temporelle
                     const ageInMinutes = (Date.now() - entry.time) / 60000;
-                    score += Math.max(0, 0.5 - (ageInMinutes / 60)); // bonus pour les évènements récents
+                    score += Math.max(0, 0.5 - (ageInMinutes / 60)); 
                     return { entry, score };
                 });
                 
-                // Trier par score décroissant et garder les meilleurs
                 const top = scored.filter(s => s.score > 0.1)
                                   .sort((a,b) => b.score - a.score)
                                   .slice(0, limit)
@@ -400,7 +391,6 @@
             }
         };
 
-        // Liste de secours de textes de journaux
         const DEFAULT_JOURNALS = [
             "FRAGMENT #1 : 'Le bruit des néons est devenu insupportable. Je crois que les murs changent de place quand je cligne des yeux. Si quelqu'un trouve cette note, ne restez pas au même endroit trop longtemps.'",
             "FRAGMENT #2 : 'L'institut ASYNC a menti. Il n'y a pas de portail de retour simple. J'ai vu une forme noire glisser à la limite de mon champ de vision... Ce n'est pas une simple simulation.'",
@@ -451,7 +441,7 @@ Format JSON EXACT attendu :
         // ==========================================
         window.onload = () => {
             initDOMCache();
-            AppMemory.init(); // Initialiser la mémoire
+            AppMemory.init(); 
             initMenus();
             init();
             animate();
@@ -484,25 +474,22 @@ Format JSON EXACT attendu :
             }
         }
 
+        // OPTIMISATION : Appel unique à gemini-2.0-flash directement pour économiser 50% de tes tokens de test !
         async function checkApiKeyValid(key) {
             try {
                 const payload = { contents: [{ parts: [{ text: "ping" }] }] };
                 
-                let res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${key}`, {
+                let res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
                 }, 5000).catch(() => null);
 
-                if (!res || !res.ok) {
-                    res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`, {
-                        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
-                    }, 5000).catch(() => null);
-                }
-
-                if (!res) return { valid: false, reason: "Impossible de joindre Google (Timeout/Réseau)." };
+                if (!res) return { valid: false, reason: "Impossible de joindre Google (Surcharge ou pas d'accès Internet)." };
                 if (res.ok) return { valid: true };
 
-                if (res.status === 400) return { valid: false, reason: "Clé API invalide (Erreur 400)." };
-                if (res.status === 403) return { valid: false, reason: "Clé non autorisée (Erreur 403)." };
+                if (res.status === 429) return { valid: false, reason: "Limite dépassée (Erreur 429) : réessayez dans 1 minute." };
+                if (res.status === 401) return { valid: false, reason: "Clé non autorisée (Erreur 401) : vérifiez votre copier-coller." };
+                if (res.status === 400) return { valid: false, reason: "Requête incorrecte (Erreur 400)." };
+                if (res.status === 403) return { valid: false, reason: "Accès interdit (Erreur 403)." };
                 return { valid: false, reason: `Erreur API Google (${res.status}).` };
             } catch (err) {
                 return { valid: false, reason: "Erreur réseau inattendue." };
@@ -746,7 +733,6 @@ Format JSON EXACT attendu :
                     return;
                 }
 
-                // Touche E pour ramasser un journal
                 if (e.key.toLowerCase() === 'e') {
                     checkAndInteractJournal();
                 }
@@ -788,7 +774,6 @@ Format JSON EXACT attendu :
             return hash(cx + 500, cz + 500) < 0.008 || dynamicAnomalies.some(a => a.cx === cx && a.cz === cz); 
         }
 
-        // Nouveau : placement dynamique des journaux au sol
         function hasJournal(cx, cz) {
             return (hash(cx + 1000, cz + 1000) < 0.015 && !isWall(cx, cz)) || dynamicJournals.some(j => j.cx === cx && j.cz === cz && !j.picked);
         }
@@ -815,9 +800,7 @@ Format JSON EXACT attendu :
                     anomalyObj.position.set(0, WALL_HEIGHT / 2, 0);
                     group.add(anomalyObj);
                 } else {
-                    // Vérifier si un journal doit spawner dans ce chunk vide
                     if (hasJournal(cx, cz)) {
-                        // Trouver ou créer le contenu du journal
                         let journalData = dynamicJournals.find(j => j.cx === cx && j.cz === cz);
                         if (!journalData) {
                             const index = Math.abs(Math.floor(hash(cx, cz) * DEFAULT_JOURNALS.length));
@@ -831,15 +814,13 @@ Format JSON EXACT attendu :
                         }
 
                         if (!journalData.picked) {
-                            // Créer un mesh "document par terre" rougeoyant
                             const planeGeo = new THREE.PlaneGeometry(1.5, 2.2);
                             journalObj = new THREE.Mesh(planeGeo, journalMaterial);
                             journalObj.rotation.x = -Math.PI / 2;
-                            journalObj.rotation.z = hash(cx, cz) * Math.PI; // angle aléatoire
+                            journalObj.rotation.z = hash(cx, cz) * Math.PI; 
                             journalObj.position.set(0, 0.05, 0);
                             group.add(journalObj);
 
-                            // Petite loupiote rouge mystique au-dessus
                             lightObj = new THREE.PointLight(0xff3333, 0.5, 5);
                             lightObj.position.set(cx * TILE_SIZE, 0.8, cz * TILE_SIZE);
                             scene.add(lightObj);
@@ -947,22 +928,18 @@ Format JSON EXACT attendu :
             return radar;
         }
 
-        // Détection et ramassage du journal devant le joueur
         function checkAndInteractJournal() {
             const px = Math.floor((camera.position.x + TILE_SIZE/2) / TILE_SIZE);
             const pz = Math.floor((camera.position.z + TILE_SIZE/2) / TILE_SIZE);
             
-            // Chercher dans les chunks actifs proches
             for (let [key, obj] of activeChunks.entries()) {
                 if (obj.journal) {
                     const dist = camera.position.distanceTo(new THREE.Vector3(obj.cx * TILE_SIZE, PLAYER_HEIGHT, obj.cz * TILE_SIZE));
                     if (dist < 10) {
-                        // Trouver l'info du journal
                         let journalData = dynamicJournals.find(j => j.cx === obj.cx && j.cz === obj.cz);
                         if (journalData && !journalData.picked) {
                             journalData.picked = true;
                             
-                            // Retirer le mesh du journal et la lumière rouge du jeu
                             obj.mesh.remove(obj.journal);
                             obj.journal.geometry.dispose();
                             obj.journal = null;
@@ -973,16 +950,13 @@ Format JSON EXACT attendu :
                                 obj.light = null;
                             }
                             
-                            // Sauvegarder l'interaction dans la mémoire à long terme
                             AppMemory.save("Explorateur", `A trouvé et lu le document '${journalData.title}': "${journalData.content}"`);
 
-                            // Afficher la popup de lecture
                             document.exitPointerLock();
                             domJournalPopup.style.display = 'flex';
                             document.getElementById('journalTitle').innerText = journalData.title;
                             domJournalContent.innerText = journalData.content;
                             
-                            // Notifier l'IA de l'avancement
                             triggerAI(`Le joueur a ramassé et lu le document nommé "${journalData.title}" avec le contenu: "${journalData.content}". Réagis psychologiquement à cela.`);
                             break;
                         }
@@ -991,7 +965,6 @@ Format JSON EXACT attendu :
             }
         }
 
-        // Met à jour l'affichage de l'aide interactive
         function updateInteractPrompt() {
             let showPrompt = false;
             for (let [key, obj] of activeChunks.entries()) {
@@ -1036,10 +1009,11 @@ Format JSON EXACT attendu :
 
         function sendPlayerMessage(msg) {
             addChatLine('Vous', msg);
-            AppMemory.save("Joueur", msg); // On sauve dans la mémoire à long terme locale
+            AppMemory.save("Joueur", msg); 
             triggerAI("Le joueur a parlé.", msg);
         }
 
+        // OPTIMISATION : Appel unique à gemini-2.0-flash directement sans double-requêtes
         async function triggerAI(reason, userMessage = "") {
             if (!geminiApiKey) {
                 if (userMessage) addChatLine("Système", "IA indisponible. L'Entité ne peut pas vous entendre.", true);
@@ -1051,7 +1025,6 @@ Format JSON EXACT attendu :
             lastAITriggerTime = performance.now();
             document.getElementById('aiStatusIndicator').style.display = 'block';
 
-            // Chercher des souvenirs pertinents à l'aide du moteur de recherche sémantique à long terme !
             const promptContextInput = userMessage || reason;
             const memoriesRecall = AppMemory.retrieveRelevant(promptContextInput, 3);
 
@@ -1077,17 +1050,15 @@ Format JSON EXACT attendu :
 
             try {
                 let data = null;
-                let res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${geminiApiKey}`, {
+                // Appel uniquement vers le modèle de production rapide 2.0-flash
+                let res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
                 }).catch(() => null);
                 
-                if (res && res.ok) data = await res.json();
-                
-                if (!data || data.error) {
-                    let fallbackRes = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`, {
-                        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
-                    }).catch(() => null);
-                    if (fallbackRes && fallbackRes.ok) data = await fallbackRes.json();
+                if (res && res.ok) {
+                    data = await res.json();
+                } else if (res && res.status === 429) {
+                    addChatLine("Système", "Limite de requêtes temporairement atteinte (Erreur 429). Attendez 1 minute.", true);
                 }
 
                 if (data && data.candidates && data.candidates[0]) {
@@ -1100,7 +1071,7 @@ Format JSON EXACT attendu :
                         
                         if (aiData.message && aiData.message.trim() !== "") {
                             addChatLine("Entité", aiData.message);
-                            AppMemory.save("L'Entité", aiData.message); // Enregistrer la parole de l'IA pour la mémoire à long terme
+                            AppMemory.save("L'Entité", aiData.message); 
                         }
                         if (aiData.actions && Array.isArray(aiData.actions)) {
                             aiData.actions.forEach(action => executeAIAction(action));
@@ -1158,11 +1129,9 @@ Format JSON EXACT attendu :
                     generateChunk(cx, cz, key);
                     break;
                 case "SPAWN_JOURNAL":
-                    // Nouveau : Commande IA pour faire apparaître un journal par terre
                     let jcx = Math.floor((camera.position.x + TILE_SIZE/2) / TILE_SIZE) + (action.rel_x || 0);
                     let jcz = Math.floor((camera.position.z + TILE_SIZE/2) / TILE_SIZE) + (action.rel_z || 0);
                     
-                    // Empêcher de spawner dans un mur
                     if (!isWall(jcx, jcz)) {
                         dynamicJournals.push({
                             cx: jcx, cz: jcz,
@@ -1227,11 +1196,10 @@ Format JSON EXACT attendu :
             const cTex = new THREE.CanvasTexture(cCanvas); cTex.wrapS = cTex.wrapT = THREE.RepeatWrapping; cTex.repeat.set(50,50);
             ceilingMaterial = new THREE.MeshStandardMaterial({ map: cTex, roughness: 0.8, metalness: 0.05 });
 
-            // Nouveau : texture de journal jauni/brûlé pour le sol
             const jCanvas = document.createElement('canvas'); jCanvas.width = 128; jCanvas.height = 128;
             const jCtx = jCanvas.getContext('2d'); jCtx.fillStyle = '#eae2cc'; jCtx.fillRect(0,0,128,128);
             jCtx.fillStyle = 'rgba(100,60,20,0.4)';
-            for(let i=0; i<15; i++) { jCtx.fillRect(10, 20 + i*6, 108, 2); } // lignes de faux texte
+            for(let i=0; i<15; i++) { jCtx.fillRect(10, 20 + i*6, 108, 2); } 
             jCtx.strokeStyle = 'rgba(120,40,20,0.3)'; jCtx.lineWidth = 4; jCtx.strokeRect(2,2,124,124);
             const jTex = new THREE.CanvasTexture(jCanvas);
             journalMaterial = new THREE.MeshBasicMaterial({ map: jTex, side: THREE.DoubleSide });
@@ -1242,7 +1210,6 @@ Format JSON EXACT attendu :
             try {
                 audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 
-                // Ambiance Hum
                 humOscillator = audioCtx.createOscillator(); 
                 humOscillator.type = 'sawtooth'; humOscillator.frequency.value = 55;
                 const lpf = audioCtx.createBiquadFilter(); lpf.type = 'lowpass'; lpf.frequency.value = 150;
@@ -1250,7 +1217,6 @@ Format JSON EXACT attendu :
                 humOscillator.connect(lpf); lpf.connect(humGain); humGain.connect(audioCtx.destination); 
                 humOscillator.start();
 
-                // Ambiance Noise
                 const noiseBuffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 2, audioCtx.sampleRate);
                 const output = noiseBuffer.getChannelData(0); 
                 for (let i = 0; i < output.length; i++) output[i] = Math.random() * 2 - 1;
@@ -1308,7 +1274,6 @@ Format JSON EXACT attendu :
                 let el = time - startTime;
                 if (domVhsTime) domVhsTime.innerText = `PLAY ▶ ${String(Math.floor(el/3600000)).padStart(2,'0')}:${String(Math.floor(el/60000)%60).padStart(2,'0')}:${String(Math.floor(el/1000)%60).padStart(2,'0')}`;
 
-                // Déplacements et Collisions
                 if (!isChatMode) {
                     velocity.x -= velocity.x * 10.0 * delta; 
                     velocity.z -= velocity.z * 10.0 * delta;
@@ -1352,10 +1317,8 @@ Format JSON EXACT attendu :
                 }
                 camera.position.y = PLAYER_HEIGHT;
 
-                // Lampe Torche
                 flashLight.position.set(Math.sin(time*0.002)*0.15, Math.cos(time*0.0015)*0.15, 0);
 
-                // Comportement du Monstre
                 if (monsterState !== 'OFF' && monster) {
                     const dx = camera.position.x - monster.position.x;
                     const dz = camera.position.z - monster.position.z;
@@ -1399,7 +1362,6 @@ Format JSON EXACT attendu :
                     }
                 }
 
-                // Ambiance environnement (Fog & Vignette)
                 scene.background.lerp(targetFogColor, 0.05); 
                 scene.fog.color.copy(scene.background);
                 scene.fog.density += (targetFogDensity - scene.fog.density) * 0.05;
@@ -1423,7 +1385,7 @@ Format JSON EXACT attendu :
                 }
 
                 updateChunks();
-                updateInteractPrompt(); // Nouveau : gère l'invite d'interaction
+                updateInteractPrompt(); 
                 
                 if (audioCtx && humGain && noiseGain) {
                     humGain.gain.value = (0.1 + Math.sin(time*0.001)*0.02) * masterVolume;
@@ -1431,13 +1393,11 @@ Format JSON EXACT attendu :
                     else noiseGain.gain.value += ((0.002 * masterVolume) - noiseGain.gain.value) * 0.1;
                 }
 
-                // Tick passif IA
                 if (geminiApiKey && !isAIPending && time - lastAITriggerTime > 45000) {
                     triggerAI("Routine d'ambiance. Le joueur marche depuis un moment. Fais quelque chose pour casser la monotonie ou sers-toi de ses souvenirs.");
                 }
             }
 
-            // Gestion des lumières
             const isFlickering = time < flickerEndTime;
             activeLights.forEach(ld => {
                 if (!ld.light) return;
@@ -1450,7 +1410,7 @@ Format JSON EXACT attendu :
 
                 if (ld.extinguished) { ld.light.intensity = 0; return; }
                 if (ld.isAnomaly) { ld.light.intensity = 1.0 + Math.sin(time*0.003)*0.5; return; }
-                if (ld.isJournal) { ld.light.intensity = 0.4 + Math.sin(time*0.005)*0.2; return; } // Nouvelle animation lumineuse pour les parchemins
+                if (ld.isJournal) { ld.light.intensity = 0.4 + Math.sin(time*0.005)*0.2; return; } 
 
                 if (isFlickering) {
                     ld.light.intensity = Math.random() > 0.5 ? 0 : (0.2 + Math.random()*0.6);
