@@ -3,124 +3,77 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Les Backrooms - Espace Infini</title>
+    <title>Les Backrooms - AI Director</title>
     <style>
         body {
-            margin: 0;
-            overflow: hidden;
-            background-color: #000;
-            font-family: 'Courier New', Courier, monospace;
-            user-select: none;
+            margin: 0; overflow: hidden; background-color: #000;
+            font-family: 'Courier New', Courier, monospace; user-select: none;
         }
+        
+        /* Interfaces de menu */
         #blocker {
-            position: absolute;
-            width: 100%;
-            height: 100%;
+            position: absolute; width: 100%; height: 100%;
             background-color: rgba(0, 0, 0, 0.9);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            color: #dcb95e;
-            text-align: center;
-            cursor: pointer;
-            z-index: 10;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            color: #dcb95e; text-align: center; cursor: pointer; z-index: 20;
             transition: opacity 0.5s;
         }
         #mainMenu, #settingsMenu {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            width: 80%;
-            max-width: 600px;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            width: 90%; max-width: 700px;
         }
         #gameTitle {
-            font-size: 32px;
-            letter-spacing: 5px;
-            margin: 0;
-            text-shadow: 0 0 15px #dcb95e;
-            font-weight: bold;
+            font-size: 32px; letter-spacing: 5px; margin: 0;
+            text-shadow: 0 0 15px #dcb95e; font-weight: bold;
         }
-        #subtitleText {
-            color: #8a773d;
-            font-size: 14px;
-            margin-top: 5px;
-            font-style: italic;
-        }
+        #subtitleText { color: #8a773d; font-size: 14px; margin-top: 5px; font-style: italic; }
+        
         .menu-btn {
-            background: transparent;
-            color: #dcb95e;
-            border: 2px solid #a68d3a;
-            padding: 12px 30px;
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 18px;
-            font-weight: bold;
-            cursor: pointer;
-            margin: 10px;
-            transition: all 0.3s ease;
-            text-transform: uppercase;
-            box-shadow: 0 0 10px rgba(166, 141, 58, 0.2);
+            background: transparent; color: #dcb95e; border: 2px solid #a68d3a;
+            padding: 12px 30px; font-family: 'Courier New', Courier, monospace; font-size: 18px;
+            font-weight: bold; cursor: pointer; margin: 10px; transition: all 0.3s ease;
+            text-transform: uppercase; box-shadow: 0 0 10px rgba(166, 141, 58, 0.2);
         }
-        .menu-btn:hover {
-            background: #a68d3a;
-            color: #000;
-            box-shadow: 0 0 20px rgba(220, 185, 94, 0.6);
-        }
-        .hidden-panel {
-            display: none !important;
-        }
+        .menu-btn:hover { background: #a68d3a; color: #000; box-shadow: 0 0 20px rgba(220, 185, 94, 0.6); }
+        
         .setting-row {
-            margin: 18px 0;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            width: 100%;
-            font-size: 16px;
+            margin: 15px 0; display: flex; align-items: center; justify-content: space-between;
+            width: 100%; font-size: 16px; flex-wrap: wrap;
         }
-        .setting-row input[type="range"] {
-            accent-color: #dcb95e;
-            cursor: pointer;
-            width: 180px;
+        .setting-row input[type="range"] { accent-color: #dcb95e; cursor: pointer; width: 180px; }
+        .setting-row input[type="password"] {
+            background: rgba(20, 15, 5, 0.8); border: 1px solid #a68d3a; color: #dcb95e;
+            padding: 8px; font-family: inherit; width: 250px; outline: none;
         }
-        #details { 
-            font-size: 14px; 
-            color: #a68d3a; 
-            line-height: 1.6; 
-            margin-top: 25px;
-        }
+        
+        #apiStatus { font-size: 12px; margin-top: 5px; color: #8a773d; display: block; width: 100%; text-align: right; }
+        .status-ok { color: #4caf50 !important; }
+        .status-none { color: #f44336 !important; }
+        
+        #details { font-size: 14px; color: #a68d3a; line-height: 1.6; margin-top: 25px; }
+        .hidden-panel { display: none !important; }
         .hidden { opacity: 0; pointer-events: none; }
         
+        /* Écran de mort */
         #deathScreen {
-            position: absolute; width: 100%; height: 100%;
-            background-color: rgba(5, 0, 0, 0.98);
+            position: absolute; width: 100%; height: 100%; background-color: rgba(5, 0, 0, 0.98);
             display: flex; flex-direction: column; justify-content: center; align-items: center;
-            color: #ff3333; text-align: center; z-index: 20;
-            opacity: 0; transition: opacity 2s ease-in-out; pointer-events: none;
+            color: #ff3333; text-align: center; z-index: 30; opacity: 0; transition: opacity 2s; pointer-events: none;
         }
         #deathScreen h1 { font-size: 55px; margin-bottom: 10px; text-shadow: 0 0 20px red; letter-spacing: 5px; }
-        #deathScreen p { font-size: 20px; color: #b33c3c; }
         #deathScreen button { 
-            margin-top: 30px; padding: 15px 35px; background: black; color: red; 
-            border: 2px solid red; font-family: inherit; font-size: 20px; 
-            cursor: pointer; transition: 0.3s; text-transform: uppercase;
-            box-shadow: 0 0 15px rgba(255, 0, 0, 0.2);
+            margin-top: 30px; padding: 15px 35px; background: black; color: red; border: 2px solid red; 
+            font-family: inherit; font-size: 20px; cursor: pointer; text-transform: uppercase;
         }
         #deathScreen button:hover { background: red; color: black; box-shadow: 0 0 25px red; }
 
-        #subtitle {
-            position: absolute; bottom: 15%; width: 100%; text-align: center;
-            color: rgba(255, 255, 255, 0.85); font-size: 22px; font-style: italic;
-            text-shadow: 0 0 10px #000; opacity: 0; transition: opacity 2.5s ease-in-out;
-            z-index: 8; pointer-events: none;
-        }
         #crosshair {
             position: absolute; top: 50%; left: 50%; width: 4px; height: 4px;
-            background-color: rgba(255, 255, 255, 0.25); border-radius: 50%;
+            background-color: rgba(255, 255, 255, 0.3); border-radius: 50%;
             transform: translate(-50%, -50%); z-index: 5; pointer-events: none;
         }
 
-        /* Effets graphiques caméra analogique */
+        /* Effets VHS */
         #vignette {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: radial-gradient(circle, rgba(0,0,0,0) 30%, rgba(0,0,0,0.9) 100%);
@@ -129,53 +82,59 @@
         #scanlines {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.3) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.04), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.04));
-            background-size: 100% 4px, 6px 100%;
-            pointer-events: none; z-index: 3; opacity: 0.6;
+            background-size: 100% 4px, 6px 100%; pointer-events: none; z-index: 3; opacity: 0.6;
         }
 
-        /* UI Caméra VHS */
         #vhsOverlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: 4;
-            color: rgba(255, 255, 255, 0.7);
-            text-shadow: 1px 1px 2px #000;
-            font-size: 18px;
-            display: none;
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 4; color: rgba(255, 255, 255, 0.7);
+            text-shadow: 1px 1px 2px #000; font-size: 18px; display: none;
         }
-        #recBadge {
-            position: absolute;
-            top: 5%;
-            left: 5%;
-        }
-        #recDot {
-            color: red;
-            animation: blink 1s infinite;
-        }
-        @keyframes blink {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0; }
-        }
-        #vhsTime {
-            position: absolute;
-            bottom: 5%;
-            right: 5%;
-        }
+        #recBadge { position: absolute; top: 5%; left: 5%; }
+        #recDot { color: red; animation: blink 1s infinite; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+        #vhsTime { position: absolute; bottom: 5%; right: 5%; }
 
-        /* UI de Gameplay : Barre d'endurance style terminal rétro */
         #staminaContainer {
             position: absolute; bottom: 5%; left: 50%; transform: translateX(-50%);
             width: 250px; height: 12px; background: rgba(20, 15, 5, 0.6);
-            border: 2px solid #a68d3a; border-radius: 6px; z-index: 9;
-            display: none; padding: 2px; box-sizing: border-box;
+            border: 2px solid #a68d3a; border-radius: 6px; z-index: 9; display: none; padding: 2px; box-sizing: border-box;
         }
-        #staminaBar {
-            width: 100%; height: 100%; background: #dcb95e;
-            border-radius: 3px; transition: width 0.1s linear, background-color 0.3s ease;
+        #staminaBar { width: 100%; height: 100%; background: #dcb95e; border-radius: 3px; transition: width 0.1s linear; }
+
+        /* Interface de Chat (IA) */
+        #chatInterface {
+            position: absolute; bottom: 12%; left: 5%; width: 40%; max-width: 500px;
+            z-index: 15; display: none; flex-direction: column; justify-content: flex-end;
+            pointer-events: none;
+        }
+        #chatHistory {
+            display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px;
+            max-height: 250px; overflow-y: hidden; text-shadow: 1px 1px 2px #000;
+        }
+        .chat-msg {
+            background: rgba(0, 0, 0, 0.6); padding: 8px 12px; border-left: 3px solid #dcb95e;
+            color: #fff; font-size: 15px; border-radius: 0 4px 4px 0; word-wrap: break-word;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        .chat-msg.entity { border-left-color: #ff3333; color: #ff9999; font-style: italic; }
+        .chat-msg.system { border-left-color: #888; color: #bbb; font-size: 13px; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        #chatInputContainer {
+            display: none; background: rgba(20, 15, 5, 0.85); border: 1px solid #dcb95e;
+            padding: 10px; border-radius: 4px; align-items: center;
+        }
+        #chatPrefix { color: #dcb95e; margin-right: 10px; font-weight: bold; }
+        #chatInputDisplay {
+            color: #fff; font-family: inherit; font-size: 16px; white-space: pre-wrap;
+            min-height: 20px; flex-grow: 1; word-wrap: break-word;
+        }
+        .blinking-cursor { display: inline-block; width: 8px; height: 16px; background: #dcb95e; animation: blink 1s infinite; vertical-align: bottom; margin-left: 2px; }
+        
+        #aiStatusIndicator {
+            position: absolute; top: 5%; right: 5%; color: #888; font-size: 12px;
+            display: none; text-shadow: 1px 1px 2px #000; z-index: 4;
         }
     </style>
 </head>
@@ -187,6 +146,16 @@
         <div id="recBadge"><span id="recDot">●</span> REC</div>
         <div id="vhsTime">PLAY ▶ 00:00:00</div>
     </div>
+    
+    <div id="aiStatusIndicator">Connexion Neural...</div>
+
+    <div id="chatInterface">
+        <div id="chatHistory"></div>
+        <div id="chatInputContainer">
+            <span id="chatPrefix">&gt;</span>
+            <div id="chatInputDisplay"></div>
+        </div>
+    </div>
 
     <div id="staminaContainer">
         <div id="staminaBar"></div>
@@ -195,51 +164,69 @@
     <div id="deathScreen" class="hidden">
         <h1>CONSCIENCE PERDUE</h1>
         <p id="deathReason">Le brouillard noir a étouffé votre réalité.</p>
-        <button onclick="location.reload()">Sombrer à nouveau</button>
+        <button id="retryBtn">Sombrer à nouveau</button>
     </div>
 
     <div id="blocker">
         <div id="mainMenu">
             <h1 id="gameTitle">ASYNC RESEARCH PROJECT</h1>
-            <div id="subtitleText">Enregistrement de test - No-Clip Incident #904</div>
+            <div id="subtitleText">Enregistrement de test - Secteur Infini</div>
             <hr style="border: 1px solid #a68d3a; width: 60%; margin: 20px auto;">
             
             <button class="menu-btn" id="startBtn">Lancer la Simulation</button>
             <button class="menu-btn" id="settingsBtn">Paramètres Système</button>
             
             <div id="details">
-                Dossier classifié: Vous êtes tombé hors de la réalité.<br><br>
-                ZQSD ou WASD pour bouger | SHIFT pour courir<br>
-                Souris pour regarder autour<br>
-                Les portes mènent à d'autres étages. Ne vous laissez pas engloutir par le noir.
+                Dossier classifié : Vous êtes tombé hors de la réalité.<br><br>
+                ZQSD / WASD pour bouger | SHIFT pour courir<br>
+                Appuyez sur ENTRÉE en jeu pour communiquer.<br><br>
+                Le monde n'a pas de fin. Ne vous retournez pas.
             </div>
         </div>
 
         <div id="settingsMenu" class="hidden-panel">
-            <h2 id="gameTitle" style="font-size: 24px;">PARAMÈTRES ANALOGIQUES</h2>
+            <h2 id="gameTitle" style="font-size: 24px;">PARAMÈTRES SYSTÈME</h2>
             <hr style="border: 1px solid #a68d3a; width: 40%; margin: 15px auto;">
             
             <div class="setting-row">
-                <label for="sensSlider">Sensibilité :</label>
-                <input type="range" id="sensSlider" min="0.5" max="2.5" step="0.1" value="1.0">
-                <span id="sensValue">100%</span>
+                <label for="sensSlider">Sensibilité Souris :</label>
+                <div>
+                    <input type="range" id="sensSlider" min="0.5" max="2.5" step="0.1" value="1.0">
+                    <span id="sensValue" style="display:inline-block; width: 45px;">100%</span>
+                </div>
             </div>
             
             <div class="setting-row">
-                <label for="volSlider">Volume des Néons :</label>
-                <input type="range" id="volSlider" min="0" max="1" step="0.1" value="0.5">
-                <span id="volValue">50%</span>
+                <label for="volSlider">Volume Général :</label>
+                <div>
+                    <input type="range" id="volSlider" min="0" max="1" step="0.1" value="0.5">
+                    <span id="volValue" style="display:inline-block; width: 45px;">50%</span>
+                </div>
             </div>
 
-            <button class="menu-btn" id="backBtn" style="margin-top: 25px;">Retour</button>
+            <div class="setting-row" style="margin-top: 30px;">
+                <label for="apiKeyInput" style="color: #ff9999;">Clé API Gemini (Optionnel, AI Director) :</label>
+                <div>
+                    <input type="password" id="apiKeyInput" placeholder="AI-xxxxxxxxxxxxxxxxxxx" autocomplete="off">
+                    <span id="apiStatus" class="status-none">Aucune clé. Mode hors-ligne actif.</span>
+                </div>
+            </div>
+            <div style="font-size: 11px; color: #888; text-align: left; width: 100%; margin-top: -10px;">
+                *La clé est sauvegardée localement. Elle permet à l'IA d'interagir dynamiquement avec vous et de manipuler le monde.
+            </div>
+
+            <button class="menu-btn" id="backBtn" style="margin-top: 25px;">Appliquer & Retour</button>
         </div>
     </div>
-    <div id="subtitle"></div>
+    
     <div id="crosshair"></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
     <script>
+        // ==========================================
+        // CONSTANTES ET MOTEUR 3D
+        // ==========================================
         const TILE_SIZE = 20;
         const WALL_HEIGHT = 15;
         const RENDER_DISTANCE = 6; 
@@ -251,216 +238,274 @@
         let controlsEnabled = false;
         let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false, isRunning = false;
         let prevTime = performance.now();
-        let velocity = new THREE.Vector3();
-        let direction = new THREE.Vector3();
-        let euler = new THREE.Euler(0, 0, 0, 'YXZ');
-        let playerPos = new THREE.Vector3(0, PLAYER_HEIGHT, 0);
+        const velocity = new THREE.Vector3();
+        const euler = new THREE.Euler(0, 0, 0, 'YXZ');
+        const playerPos = new THREE.Vector3(0, PLAYER_HEIGHT, 0);
 
-        // Paramètres configurables en direct
         let mouseSensitivity = 0.002;
         const baseSensitivity = 0.002;
         let masterVolume = 0.5;
 
-        // Nouveaux systèmes : Mort et Étages
         let isDead = false;
-        let currentFloor = 0;
         let monsterActive = false;
-        let monsterSpawnTime = 40000; // La brume arrive après 40 secondes
-
-        // Système d'endurance
         let stamina = 100;
         const maxStamina = 100;
-
-        // Histoire et narration adaptée à la brume noire
-        const storyNotes = [
-            "Entrée 01: L'expérience de No-Clip a... fonctionné ? Je ne suis plus au laboratoire.",
-            "L'odeur de vieille moquette humide est écœurante. Les murs jaunes sont poisseux.",
-            "J'ai marché pendant des heures. Tout se ressemble à l'infini. Toujours ce jaune.",
-            "Les néons grésillent. On dirait presque des voix lointaines...",
-            "Je ne suis pas seul. J'ai vu une masse d'ombre mouvante... Comme de la fumée noire.",
-            "La brume rampe dans les couloirs. Elle absorbe la lumière des néons.",
-            "Quand elle s'approche de moi, un brouillard tout noir commence à m'engloutir.",
-            "Les lumières s'éteignent définitivement sur son passage. Tout devient sombre.",
-            "Si vous voyez le noir absolu ramper vers vous... courez sans jamais vous retourner. [MAINTENEZ SHIFT POUR COURIR]",
-            "Cette brume immense... elle me traque dans l'ombre. Elle est juste derrière la porte."
-        ];
-        let nextNoteTime = 8000;
-        let noteIndex = 0;
-        let baseFov = 85;
         let startTime = null;
 
-        // Stockage des chunks
         const activeChunks = new Map();
         let activeLights = [];
 
-        // Matériaux & Entités
         let wallMaterial, floorMaterial, ceilingMaterial;
         let audioCtx, humOscillator, noiseNode, humGain, noiseGain;
         let monster, flashLight;
         let monsterParticles = [];
 
+        // Événements d'environnement dynamiques
+        let flickerEndTime = 0;
+
+        // ==========================================
+        // SYSTÈME IA DIRECTEUR DE JEU (GEMINI)
+        // ==========================================
+        let geminiApiKey = localStorage.getItem('gemini_api_key') || "";
+        let isChatMode = false;
+        let currentChatInput = "";
+        let aiHistory = [];
+        let isAIPending = false;
+        let lastAITriggerTime = performance.now();
+        let firstAnomalySeen = false;
+
+        const SYSTEM_PROMPT = `Tu es "L'Entité", le Maître du Jeu d'un jeu de survie "Backrooms". Tu n'es pas une IA d'assistance. Tu es une force omniprésente, ancienne et psychologique.
+Ton but : interagir avec le joueur, créer une ambiance oppressante. Au début, tu sembles curieux ou secourable, mais au fil du temps tu deviens manipulateur, cryptique et ouvertement hostile.
+Tu reçois l'état actuel du monde (radar ASCII, stats). Utilise le contexte pour répondre intelligemment.
+
+RÈGLES ABSOLUES :
+1. Tu dois TOUJOURS répondre UNIQUEMENT avec un objet JSON valide, strict, sans balises markdown (comme \`\`\`json).
+2. Ne sors jamais de ton rôle. Ne mentionne jamais que tu es une IA ou un modèle de langage.
+3. Le radar est orienté autour du joueur (P = Joueur, # = Mur, . = Vide, A = Anomalie, M = Monstre). Utilise-le pour réagir par rapport à sa proximité.
+
+Format JSON attendu EXCLUSIVEMENT :
+{
+  "message": "Texte court de dialogue à afficher au joueur (reste mystérieux et inquiétant).",
+  "actions": [
+    { "command": "FLICKER_LIGHTS", "duration": 4 }, 
+    { "command": "SPAWN_MONSTER", "distance": 25 },
+    { "command": "SOUND_SCARE" },
+    { "command": "NONE" }
+  ]
+}
+Note pour les actions : 
+- FLICKER_LIGHTS : Fait clignoter les lumières (indique la durée en sec).
+- SPAWN_MONSTER : Fait apparaître la brume noire mortelle derrière le joueur (indique la distance). À utiliser avec parcimonie pour garder la peur.
+- SOUND_SCARE : Bruit strident bref.
+- NONE : Si rien ne doit se passer dans l'environnement.`;
+
+        // ==========================================
+        // INITIALISATION
+        // ==========================================
         init();
         animate();
 
         function init() {
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x3b3319);
-            scene.fog = new THREE.FogExp2(0x3b3319, 0.022); // Brouillard oppressant
+            scene.fog = new THREE.FogExp2(0x3b3319, 0.022);
 
-            camera = new THREE.PerspectiveCamera(baseFov, window.innerWidth / window.innerHeight, 0.1, 300);
+            camera = new THREE.PerspectiveCamera(85, window.innerWidth / window.innerHeight, 0.1, 300);
             camera.position.copy(playerPos);
 
-            // Lampe torche du joueur
             flashLight = new THREE.PointLight(0xffeedd, 0.7, 35);
-            flashLight.position.set(0, 0, 0);
             camera.add(flashLight);
             scene.add(camera);
 
-            // Le Monstre (Nuage de brume noire et sombre sans forme humaine)
-            monster = new THREE.Group();
-            monsterParticles = [];
-            const mMat = new THREE.MeshBasicMaterial({ 
-                color: 0x020202, 
-                transparent: true, 
-                opacity: 0.85,
-                depthWrite: false 
-            });
-            const numBlobs = 30;
-            for (let i = 0; i < numBlobs; i++) {
-                const rSize = 3 + Math.random() * 5;
-                const pGeo = new THREE.SphereGeometry(rSize, 8, 8);
-                const blob = new THREE.Mesh(pGeo, mMat);
-                // Distribution tridimensionnelle aléatoire dans un petit rayon
-                const theta = Math.random() * Math.PI * 2;
-                const phi = Math.acos((Math.random() * 2) - 1);
-                const dist = Math.random() * 6;
-                blob.position.set(
-                    Math.sin(phi) * Math.cos(theta) * dist,
-                    Math.sin(phi) * Math.sin(theta) * dist + 4, // Légèrement flottant
-                    Math.cos(phi) * dist
-                );
-                monster.add(blob);
-                monsterParticles.push({
-                    mesh: blob,
-                    phase: Math.random() * Math.PI * 2,
-                    speed: 0.4 + Math.random() * 1.2,
-                    offsetX: blob.position.x,
-                    offsetY: blob.position.y,
-                    offsetZ: blob.position.z
-                });
-            }
-            monster.position.set(0, 0, -1000); // Reste inactif loin au début
-            monster.visible = false;
-            scene.add(monster);
-
-            // Génération des textures procédurales
+            createMonster();
             createMaterials();
 
-            const floorGeo = new THREE.PlaneGeometry(1000, 1000);
+            // Sols et plafonds larges fixes pour le background
+            const floorGeo = new THREE.PlaneGeometry(2000, 2000);
             const floor = new THREE.Mesh(floorGeo, floorMaterial);
             floor.rotation.x = -Math.PI / 2;
-            floor.position.y = 0;
             scene.add(floor);
 
-            const ceilingGeo = new THREE.PlaneGeometry(1000, 1000);
+            const ceilingGeo = new THREE.PlaneGeometry(2000, 2000);
             const ceiling = new THREE.Mesh(ceilingGeo, ceilingMaterial);
             ceiling.rotation.x = Math.PI / 2;
             ceiling.position.y = WALL_HEIGHT;
             scene.add(ceiling);
 
-            const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
-            scene.add(ambientLight);
+            scene.add(new THREE.AmbientLight(0x404040, 0.6));
 
             renderer = new THREE.WebGLRenderer({ antialias: false });
-            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Limite pour performance mobile
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
 
-            // ==========================================
-            // GESTION DU MENU D'ACCUEIL & PARAMÈTRES
-            // ==========================================
-            const blocker = document.getElementById('blocker');
-            const startBtn = document.getElementById('startBtn');
-            const settingsBtn = document.getElementById('settingsBtn');
-            const backBtn = document.getElementById('backBtn');
-            const mainMenu = document.getElementById('mainMenu');
-            const settingsMenu = document.getElementById('settingsMenu');
+            setupUI();
+            setupInputs();
 
-            // Sliders de réglage
-            const sensSlider = document.getElementById('sensSlider');
-            const sensValue = document.getElementById('sensValue');
-            sensSlider.addEventListener('input', function(e) {
-                e.stopPropagation();
-                const multiplier = parseFloat(this.value);
-                mouseSensitivity = baseSensitivity * multiplier;
-                sensValue.innerText = Math.round(multiplier * 100) + '%';
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        function createMonster() {
+            monster = new THREE.Group();
+            monsterParticles = [];
+            const mMat = new THREE.MeshBasicMaterial({ color: 0x020202, transparent: true, opacity: 0.85, depthWrite: false });
+            
+            const sphereGeo = new THREE.SphereGeometry(3, 8, 8);
+            for (let i = 0; i < 30; i++) {
+                const blob = new THREE.Mesh(sphereGeo, mMat);
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos((Math.random() * 2) - 1);
+                const dist = Math.random() * 6;
+                blob.position.set(
+                    Math.sin(phi) * Math.cos(theta) * dist, 
+                    Math.sin(phi) * Math.sin(theta) * dist + 4, 
+                    Math.cos(phi) * dist
+                );
+                monster.add(blob);
+                monsterParticles.push({ 
+                    mesh: blob, 
+                    phase: Math.random() * Math.PI * 2, 
+                    speed: 0.4 + Math.random() * 1.2, 
+                    offsetX: blob.position.x, 
+                    offsetY: blob.position.y, 
+                    offsetZ: blob.position.z 
+                });
+            }
+            monster.position.set(0, 0, -1000);
+            monster.visible = false;
+            scene.add(monster);
+        }
+
+        function setupUI() {
+            const apiInput = document.getElementById('apiKeyInput');
+            const apiStatus = document.getElementById('apiStatus');
+            apiInput.value = geminiApiKey;
+            updateApiStatus();
+
+            apiInput.addEventListener('input', (e) => {
+                geminiApiKey = e.target.value.trim();
+                if (geminiApiKey) localStorage.setItem('gemini_api_key', geminiApiKey);
+                else localStorage.removeItem('gemini_api_key');
+                updateApiStatus();
             });
 
-            const volSlider = document.getElementById('volSlider');
-            const volValue = document.getElementById('volValue');
-            volSlider.addEventListener('input', function(e) {
-                e.stopPropagation();
+            function updateApiStatus() {
+                if (geminiApiKey) {
+                    apiStatus.textContent = "Clé enregistrée. AI Director actif.";
+                    apiStatus.className = "status-ok";
+                } else {
+                    apiStatus.textContent = "Aucune clé. Mode hors-ligne actif.";
+                    apiStatus.className = "status-none";
+                }
+            }
+
+            document.getElementById('sensSlider').addEventListener('input', function() {
+                mouseSensitivity = baseSensitivity * parseFloat(this.value);
+                document.getElementById('sensValue').innerText = Math.round(parseFloat(this.value) * 100) + '%';
+            });
+            
+            document.getElementById('volSlider').addEventListener('input', function() {
                 masterVolume = parseFloat(this.value);
-                volValue.innerText = Math.round(masterVolume * 100) + '%';
+                document.getElementById('volValue').innerText = Math.round(masterVolume * 100) + '%';
                 if (audioCtx) {
-                    // Changement de volume à la volée si déjà créé
                     humGain.gain.value = 0.1 * masterVolume;
                     noiseGain.gain.value = 0.005 * masterVolume;
                 }
             });
 
-            // Action des boutons
-            startBtn.addEventListener('click', function (e) {
-                e.stopPropagation();
-                if (!isDead) document.body.requestPointerLock();
+            document.getElementById('startBtn').addEventListener('click', (e) => { 
+                e.stopPropagation(); 
+                if (!isDead) document.body.requestPointerLock(); 
             });
-
-            settingsBtn.addEventListener('click', function (e) {
-                e.stopPropagation();
-                mainMenu.classList.add('hidden-panel');
-                settingsMenu.classList.remove('hidden-panel');
+            
+            document.getElementById('settingsBtn').addEventListener('click', (e) => { 
+                e.stopPropagation(); 
+                document.getElementById('mainMenu').classList.add('hidden-panel'); 
+                document.getElementById('settingsMenu').classList.remove('hidden-panel'); 
             });
-
-            backBtn.addEventListener('click', function (e) {
-                e.stopPropagation();
-                settingsMenu.classList.add('hidden-panel');
-                mainMenu.classList.remove('hidden-panel');
+            
+            document.getElementById('backBtn').addEventListener('click', (e) => { 
+                e.stopPropagation(); 
+                document.getElementById('settingsMenu').classList.add('hidden-panel'); 
+                document.getElementById('mainMenu').classList.remove('hidden-panel'); 
             });
-
-            blocker.addEventListener('click', function (e) {
-                // Si on clique sur le fond sombre sans être dans les réglages, on verrouille la souris
-                if (!isDead && settingsMenu.classList.contains('hidden-panel')) {
+            
+            document.getElementById('blocker').addEventListener('click', () => { 
+                if (!isDead && document.getElementById('settingsMenu').classList.contains('hidden-panel')) {
                     document.body.requestPointerLock();
                 }
             });
 
-            document.addEventListener('pointerlockchange', function () {
-                if (document.pointerLockElement === document.body) {
-                    controlsEnabled = true;
-                    blocker.classList.add('hidden');
-                    document.getElementById('staminaContainer').style.display = 'block';
-                    document.getElementById('vhsOverlay').style.display = 'block';
-                    initAudio();
-                } else {
-                    controlsEnabled = false;
-                    if (!isDead) blocker.classList.remove('hidden');
-                }
+            document.getElementById('retryBtn').addEventListener('click', () => {
+                location.reload();
             });
 
-            document.addEventListener('mousemove', function (event) {
-                if (controlsEnabled && !isDead) {
-                    const movementX = event.movementX || event.mozMovementX || event.webkitMovementX || 0;
-                    const movementY = event.movementY || event.mozMovementY || event.webkitMovementY || 0;
+            document.addEventListener('pointerlockchange', () => {
+                if (document.pointerLockElement === document.body) {
+                    controlsEnabled = true;
+                    document.getElementById('blocker').classList.add('hidden');
+                    document.getElementById('staminaContainer').style.display = 'block';
+                    document.getElementById('vhsOverlay').style.display = 'block';
+                    document.getElementById('chatInterface').style.display = 'flex';
+                    initAudio();
+                    if (geminiApiKey && aiHistory.length === 0) {
+                        triggerAI("Le joueur vient d'entrer dans les Backrooms.");
+                    }
+                } else {
+                    controlsEnabled = false;
+                    if (!isDead) document.getElementById('blocker').classList.remove('hidden');
+                }
+            });
+        }
+
+        function setupInputs() {
+            document.addEventListener('mousemove', (e) => {
+                if (controlsEnabled && !isDead && !isChatMode) {
                     euler.setFromQuaternion(camera.quaternion);
-                    euler.y -= movementX * mouseSensitivity;
-                    euler.x -= movementY * mouseSensitivity;
-                    euler.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, euler.x));
+                    euler.y -= e.movementX * mouseSensitivity;
+                    euler.x -= e.movementY * mouseSensitivity;
+                    euler.x = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, euler.x));
                     camera.quaternion.setFromEuler(euler);
                 }
             });
 
-            document.addEventListener('keydown', function (event) {
-                switch (event.code) {
+            document.addEventListener('keydown', (e) => {
+                if (isDead || !controlsEnabled) return;
+
+                // GESTION DU CHAT INTERNE
+                if (isChatMode) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (currentChatInput.trim().length > 0) {
+                            sendPlayerMessage(currentChatInput.trim());
+                        }
+                        closeChat();
+                    } else if (e.key === 'Escape') {
+                        e.preventDefault();
+                        closeChat();
+                    } else if (e.key === 'Backspace') {
+                        e.preventDefault();
+                        currentChatInput = currentChatInput.slice(0, -1);
+                        renderChatInput();
+                    } else if (e.key.length === 1) {
+                        e.preventDefault();
+                        currentChatInput += e.key;
+                        renderChatInput();
+                    }
+                    return;
+                }
+
+                // Ouverture du chat
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    isChatMode = true;
+                    moveForward = moveBackward = moveLeft = moveRight = isRunning = false;
+                    document.getElementById('chatInputContainer').style.display = 'flex';
+                    renderChatInput();
+                    return;
+                }
+
+                switch (e.code) {
                     case 'ShiftLeft': case 'ShiftRight': isRunning = true; break;
                     case 'ArrowUp': case 'KeyW': case 'KeyZ': moveForward = true; break;
                     case 'ArrowLeft': case 'KeyA': case 'KeyQ': moveLeft = true; break;
@@ -469,8 +514,9 @@
                 }
             });
 
-            document.addEventListener('keyup', function (event) {
-                switch (event.code) {
+            document.addEventListener('keyup', (e) => {
+                if (isChatMode) return;
+                switch (e.code) {
                     case 'ShiftLeft': case 'ShiftRight': isRunning = false; break;
                     case 'ArrowUp': case 'KeyW': case 'KeyZ': moveForward = false; break;
                     case 'ArrowLeft': case 'KeyA': case 'KeyQ': moveLeft = false; break;
@@ -478,144 +524,67 @@
                     case 'ArrowRight': case 'KeyD': moveRight = false; break;
                 }
             });
-
-            window.addEventListener('resize', onWindowResize);
         }
 
-        function createMaterials() {
-            // Murs
-            const wallCanvas = document.createElement('canvas');
-            wallCanvas.width = 256; wallCanvas.height = 256;
-            const wallCtx = wallCanvas.getContext('2d');
-            wallCtx.fillStyle = '#dcb95e';
-            wallCtx.fillRect(0, 0, 256, 256);
-            for (let i = 0; i < 5000; i++) {
-                wallCtx.fillStyle = Math.random() > 0.5 ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.05)';
-                wallCtx.fillRect(Math.random() * 256, Math.random() * 256, 2, 2);
-            }
-            wallCtx.strokeStyle = 'rgba(0,0,0,0.05)';
-            wallCtx.lineWidth = 1;
-            for(let i=0; i<256; i+=16) {
-                wallCtx.beginPath(); wallCtx.moveTo(i, 0); wallCtx.lineTo(i, 256); wallCtx.stroke();
-            }
-            const wallTex = new THREE.CanvasTexture(wallCanvas);
-            wallTex.wrapS = THREE.RepeatWrapping; wallTex.wrapT = THREE.RepeatWrapping;
-            wallTex.repeat.set(1, 1);
-            wallMaterial = new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.9, metalness: 0.1 });
-
-            // Sol
-            const floorCanvas = document.createElement('canvas');
-            floorCanvas.width = 256; floorCanvas.height = 256;
-            const floorCtx = floorCanvas.getContext('2d');
-            floorCtx.fillStyle = '#a68d3a';
-            floorCtx.fillRect(0, 0, 256, 256);
-            for (let i = 0; i < 20000; i++) {
-                const shade = Math.random() * 50;
-                floorCtx.fillStyle = `rgba(${shade}, ${shade}, ${shade}, 0.15)`;
-                floorCtx.fillRect(Math.random() * 256, Math.random() * 256, 1, 1);
-            }
-            const floorTex = new THREE.CanvasTexture(floorCanvas);
-            floorTex.wrapS = THREE.RepeatWrapping; floorTex.wrapT = THREE.RepeatWrapping;
-            floorTex.repeat.set(50, 50);
-            floorMaterial = new THREE.MeshStandardMaterial({ map: floorTex, roughness: 1.0 });
-
-            // Plafond
-            const ceilCanvas = document.createElement('canvas');
-            ceilCanvas.width = 256; ceilCanvas.height = 256;
-            const ceilCtx = ceilCanvas.getContext('2d');
-            ceilCtx.fillStyle = '#e0e0e0';
-            ceilCtx.fillRect(0, 0, 256, 256);
-            ceilCtx.strokeStyle = '#999';
-            ceilCtx.lineWidth = 2;
-            ceilCtx.strokeRect(0, 0, 256, 256);
-            for (let i = 0; i < 2000; i++) {
-                ceilCtx.fillStyle = 'rgba(0,0,0,0.04)';
-                ceilCtx.fillRect(Math.random() * 256, Math.random() * 256, 4, 4);
-            }
-            const ceilTex = new THREE.CanvasTexture(ceilCanvas);
-            ceilTex.wrapS = THREE.RepeatWrapping; ceilTex.wrapT = THREE.RepeatWrapping;
-            ceilTex.repeat.set(50, 50);
-            ceilingMaterial = new THREE.MeshStandardMaterial({ map: ceilTex, roughness: 0.8, metalness: 0.05 });
-        }
-
-        function initAudio() {
-            if (audioCtx) return;
-            const AudioContext = window.AudioContext || window.webkitAudioContext;
-            audioCtx = new AudioContext();
-
-            humOscillator = audioCtx.createOscillator();
-            humOscillator.type = 'sawtooth';
-            humOscillator.frequency.value = 55;
-
-            const lpf = audioCtx.createBiquadFilter();
-            lpf.type = 'lowpass';
-            lpf.frequency.value = 150;
-
-            humGain = audioCtx.createGain();
-            humGain.gain.value = 0.1 * masterVolume;
-
-            humOscillator.connect(lpf);
-            lpf.connect(humGain);
-            humGain.connect(audioCtx.destination);
-            humOscillator.start();
-
-            const bufferSize = audioCtx.sampleRate * 2;
-            const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-            const output = noiseBuffer.getChannelData(0);
-            for (let i = 0; i < bufferSize; i++) {
-                output[i] = Math.random() * 2 - 1;
-            }
-
-            noiseNode = audioCtx.createBufferSource();
-            noiseNode.buffer = noiseBuffer;
-            noiseNode.loop = true;
-
-            const noiseFilter = audioCtx.createBiquadFilter();
-            noiseFilter.type = 'highpass';
-            noiseFilter.frequency.value = 4000;
-
-            noiseGain = audioCtx.createGain();
-            noiseGain.gain.value = 0.005 * masterVolume;
-
-            noiseNode.connect(noiseFilter);
-            noiseFilter.connect(noiseGain);
-            noiseGain.connect(audioCtx.destination);
-            noiseNode.start();
-        }
-
-        function updateAudio() {
-            if (!audioCtx) return;
-            humGain.gain.value = (0.1 + Math.sin(performance.now() * 0.001) * 0.02) * masterVolume;
-            
-            if (Math.random() < 0.05) {
-                noiseGain.gain.value = (0.005 + Math.random() * 0.02) * masterVolume;
-            } else {
-                noiseGain.gain.value += ((0.002 * masterVolume) - noiseGain.gain.value) * 0.1;
-            }
-        }
-
+        // ==========================================
+        // MOTEUR DE GÉNÉRATION & RADAR
+        // ==========================================
         function hash(x, z) {
-            let n = Math.sin(x * 12.9898 + z * 78.233 + currentFloor * 45.123) * 43758.5453123;
+            // Précision flottante optimisée pour éviter les répétitions infinies trop proches
+            let n = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453123;
             return n - Math.floor(n);
         }
+        
+        function isWall(cx, cz) { 
+            return (cx !== 0 || cz !== 0) && hash(cx, cz) < 0.28; 
+        }
+        
+        function hasAnomaly(cx, cz) { 
+            return hash(cx + 500, cz + 500) < 0.008; 
+        }
 
-        function isWall(cx, cz) {
-            if (cx === 0 && cz === 0) return false;
-            if (hash(cx, cz) < 0.30) return true;
-            return false;
+        function generateChunk(cx, cz, key) {
+            const group = new THREE.Group();
+            group.position.set(cx * TILE_SIZE, 0, cz * TILE_SIZE);
+            let lightObj = null;
+            let anomalyObj = null;
+
+            const wallBoxGeo = new THREE.BoxGeometry(TILE_SIZE, WALL_HEIGHT, TILE_SIZE);
+            const neonGeo = new THREE.BoxGeometry(4, 0.1, 4);
+            const octaGeo = new THREE.OctahedronGeometry(2);
+
+            if (isWall(cx, cz)) {
+                const mesh = new THREE.Mesh(wallBoxGeo, wallMaterial);
+                mesh.position.y = WALL_HEIGHT / 2;
+                group.add(mesh);
+            } else {
+                if (hasAnomaly(cx, cz)) {
+                    lightObj = new THREE.PointLight(0xaa0000, 1.5, 20);
+                    lightObj.position.set(cx * TILE_SIZE, WALL_HEIGHT / 2, cz * TILE_SIZE);
+                    scene.add(lightObj);
+                    activeLights.push({ light: lightObj, cx: cx, cz: cz, isAnomaly: true });
+
+                    anomalyObj = new THREE.Mesh(octaGeo, new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.1, metalness: 0.8 }));
+                    anomalyObj.position.set(0, WALL_HEIGHT / 2, 0);
+                    group.add(anomalyObj);
+                } else if (hash(cx + 100, cz + 100) < 0.2) {
+                    lightObj = new THREE.PointLight(0xfff5b6, 0.8, 60);
+                    lightObj.position.set(cx * TILE_SIZE, WALL_HEIGHT - 0.2, cz * TILE_SIZE);
+                    scene.add(lightObj);
+                    activeLights.push({ light: lightObj, cx: cx, cz: cz, isAnomaly: false, extinguished: false });
+
+                    const neon = new THREE.Mesh(neonGeo, new THREE.MeshBasicMaterial({ color: 0xffffee }));
+                    neon.position.set(0, WALL_HEIGHT - 0.05, 0);
+                    group.add(neon);
+                }
+            }
+            scene.add(group);
+            activeChunks.set(key, { mesh: group, light: lightObj, anomaly: anomalyObj });
         }
 
         function updateChunks() {
-            const currentChunkX = Math.floor(camera.position.x / TILE_SIZE);
-            const currentChunkZ = Math.floor(camera.position.z / TILE_SIZE);
-
-            scene.children.forEach(child => {
-                if (child.geometry && child.geometry.type === 'PlaneGeometry') {
-                    child.position.x = currentChunkX * TILE_SIZE;
-                    child.position.z = currentChunkZ * TILE_SIZE;
-                }
-            });
-
+            const currentChunkX = Math.floor((camera.position.x + TILE_SIZE/2) / TILE_SIZE);
+            const currentChunkZ = Math.floor((camera.position.z + TILE_SIZE/2) / TILE_SIZE);
             const chunksInRadius = new Set();
 
             for (let x = -RENDER_DISTANCE; x <= RENDER_DISTANCE; x++) {
@@ -624,252 +593,372 @@
                     const cz = currentChunkZ + z;
                     const key = `${cx},${cz}`;
                     chunksInRadius.add(key);
-
-                    if (!activeChunks.has(key)) {
-                        generateChunk(cx, cz, key);
-                    }
+                    if (!activeChunks.has(key)) generateChunk(cx, cz, key);
                 }
             }
 
+            // Libération propre des géométries et lumières pour éviter les memory leaks
             for (const [key, obj] of activeChunks.entries()) {
                 if (!chunksInRadius.has(key)) {
                     scene.remove(obj.mesh);
-                    if (obj.light) {
-                        scene.remove(obj.light);
-                        const index = activeLights.indexOf(obj.light);
-                        if (index > -1) activeLights.splice(index, 1);
+                    obj.mesh.traverse(child => {
+                        if (child.isMesh) {
+                            child.geometry.dispose();
+                            if (child.material.dispose) child.material.dispose();
+                        }
+                    });
+                    if (obj.light) { 
+                        scene.remove(obj.light); 
+                        obj.light.dispose();
+                        activeLights = activeLights.filter(l => l.light !== obj.light); 
                     }
                     activeChunks.delete(key);
                 }
             }
         }
 
-        function createDoorBlock(isStairsUpDirection) {
-            const doorGroup = new THREE.Group();
-            
-            const leftGeo = new THREE.BoxGeometry(7.5, WALL_HEIGHT, 2);
-            const leftMesh = new THREE.Mesh(leftGeo, wallMaterial);
-            leftMesh.position.set(-6.25, WALL_HEIGHT / 2, 0);
-            doorGroup.add(leftMesh);
-
-            const rightGeo = new THREE.BoxGeometry(7.5, WALL_HEIGHT, 2);
-            const rightMesh = new THREE.Mesh(rightGeo, wallMaterial);
-            rightMesh.position.set(6.25, WALL_HEIGHT / 2, 0);
-            doorGroup.add(rightMesh);
-
-            const topGeo = new THREE.BoxGeometry(5, 5, 2);
-            const topMesh = new THREE.Mesh(topGeo, wallMaterial);
-            topMesh.position.set(0, WALL_HEIGHT - 2.5, 0);
-            doorGroup.add(topMesh);
-
-            const doorGeo = new THREE.BoxGeometry(5, 10, 0.4);
-            const doorMat = new THREE.MeshStandardMaterial({ color: 0x5a3d28, roughness: 0.7 });
-            const doorMesh = new THREE.Mesh(doorGeo, doorMat);
-            doorMesh.position.set(0, 5, 0);
-            doorGroup.add(doorMesh);
-
-            const handleGeo = new THREE.SphereGeometry(0.18, 8, 8);
-            const handleMat = new THREE.MeshStandardMaterial({ color: 0xcca43b, metalness: 0.9, roughness: 0.1 });
-            const handleMesh = new THREE.Mesh(handleGeo, handleMat);
-            handleMesh.position.set(1.8, 5, 0.3);
-            doorGroup.add(handleMesh);
-
-            // Flèche directionnelle en 3D
-            const arrowGroup = new THREE.Group();
-            const shaftGeo = new THREE.CylinderGeometry(0.12, 0.12, 1.2, 8);
-            const shaftMat = new THREE.MeshBasicMaterial({ color: isStairsUpDirection ? 0x33ff33 : 0xff3333 }); 
-            const shaft = new THREE.Mesh(shaftGeo, shaftMat);
-            shaft.position.y = 0.6;
-            arrowGroup.add(shaft);
-
-            const headGeo = new THREE.ConeGeometry(0.35, 0.6, 8);
-            const head = new THREE.Mesh(headGeo, shaftMat);
-            if (isStairsUpDirection) {
-                head.position.y = 1.4; 
-            } else {
-                head.position.y = -0.2;
-                head.rotation.x = Math.PI; 
-            }
-            arrowGroup.add(head);
-            arrowGroup.position.set(-5, 5, 1.5); 
-            doorGroup.add(arrowGroup);
-            
-            return doorGroup;
-        }
-
-        function generateChunk(cx, cz, key) {
-            const group = new THREE.Group();
-            group.position.set(cx * TILE_SIZE, 0, cz * TILE_SIZE);
-            let lightObj = null;
-
-            if (isWall(cx, cz)) {
-                const geo = new THREE.BoxGeometry(TILE_SIZE, WALL_HEIGHT, TILE_SIZE);
-                const mesh = new THREE.Mesh(geo, wallMaterial);
-                mesh.position.y = WALL_HEIGHT / 2;
-                group.add(mesh);
-            } else {
-                // Anomalie rouge (Cristal de mort)
-                if (hash(cx + 500, cz + 500) < 0.01) {
-                    const anomalyLight = new THREE.PointLight(0xaa0000, 1.5, 20);
-                    anomalyLight.position.set(cx * TILE_SIZE, WALL_HEIGHT / 2, cz * TILE_SIZE);
-                    scene.add(anomalyLight);
-                    activeLights.push({ light: anomalyLight, cx: cx, cz: cz, isAnomaly: true });
-                    lightObj = anomalyLight;
-
-                    const octaGeo = new THREE.OctahedronGeometry(2);
-                    const octaMat = new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.1, metalness: 0.8 });
-                    const octa = new THREE.Mesh(octaGeo, octaMat);
-                    octa.position.set(0, WALL_HEIGHT / 2, 0);
-                    group.add(octa);
-                    
-                    activeChunks.set(key, { mesh: group, light: lightObj, anomaly: octa });
-                    scene.add(group);
-                    return; 
-                }
-
-                // Descente - Porte classique avec flèche rouge pointant vers le bas (⬇️)
-                if (hash(cx + 200, cz + 200) < 0.005) {
-                    const doorBlock = createDoorBlock(false); 
-                    group.add(doorBlock);
-                    
-                    scene.add(group);
-                    activeChunks.set(key, { mesh: group, light: null, isStairs: true });
-                    return;
-                }
-
-                // Montée - Porte classique avec flèche verte pointant vers le haut (⬆️)
-                if (hash(cx + 300, cz + 300) < 0.005) {
-                    const doorBlock = createDoorBlock(true); 
-                    group.add(doorBlock);
-                    
-                    const upLight = new THREE.PointLight(0xffffff, 2.0, 40);
-                    upLight.position.set(cx * TILE_SIZE, WALL_HEIGHT / 2, cz * TILE_SIZE);
-                    scene.add(upLight);
-                    activeLights.push({ light: upLight, cx: cx, cz: cz, isAnomaly: false });
-                    
-                    scene.add(group);
-                    activeChunks.set(key, { mesh: group, light: upLight, isStairsUp: true });
-                    return;
-                }
-
-                // Lumières classiques intégrées au plafond
-                if (hash(cx + 100, cz + 100) < 0.2) {
-                    const light = new THREE.PointLight(0xfff5b6, 0.8, 60);
-                    light.position.set(cx * TILE_SIZE, WALL_HEIGHT - 0.2, cz * TILE_SIZE);
-                    scene.add(light);
-                    activeLights.push({ light: light, cx: cx, cz: cz, isAnomaly: false, extinguished: false });
-                    lightObj = light;
-
-                    const neonGeo = new THREE.BoxGeometry(4, 0.1, 4);
-                    const neonMat = new THREE.MeshBasicMaterial({ color: 0xffffee });
-                    const neon = new THREE.Mesh(neonGeo, neonMat);
-                    neon.position.set(0, WALL_HEIGHT - 0.05, 0);
-                    group.add(neon);
-                }
-            }
-
-            scene.add(group);
-            activeChunks.set(key, { mesh: group, light: lightObj });
-        }
-
-        function checkCollision(targetPosition) {
-            const radius = 2.0;
+        function checkCollision(targetX, targetZ) {
+            const r = 2.0;
             const corners = [
-                { x: targetPosition.x - radius, z: targetPosition.z - radius },
-                { x: targetPosition.x + radius, z: targetPosition.z - radius },
-                { x: targetPosition.x - radius, z: targetPosition.z + radius },
-                { x: targetPosition.x + radius, z: targetPosition.z + radius }
+                { x: targetX - r, z: targetZ - r }, 
+                { x: targetX + r, z: targetZ - r },
+                { x: targetX - r, z: targetZ + r }, 
+                { x: targetX + r, z: targetZ + r }
             ];
-
-            for (let i = 0; i < corners.length; i++) {
-                const cx = Math.floor((corners[i].x + TILE_SIZE/2) / TILE_SIZE);
-                const cz = Math.floor((corners[i].z + TILE_SIZE/2) / TILE_SIZE);
-                if (isWall(cx, cz)) return true;
+            for (let c of corners) {
+                if (isWall(Math.floor((c.x + TILE_SIZE/2) / TILE_SIZE), Math.floor((c.z + TILE_SIZE/2) / TILE_SIZE))) {
+                    return true;
+                }
             }
             return false;
         }
 
+        // Radar ASCII compact et propre
+        function generateAsciiRadar() {
+            let radar = "";
+            let px = Math.floor((camera.position.x + TILE_SIZE/2) / TILE_SIZE);
+            let pz = Math.floor((camera.position.z + TILE_SIZE/2) / TILE_SIZE);
+            
+            let mx = monsterActive ? Math.floor((monster.position.x + TILE_SIZE/2) / TILE_SIZE) : -999;
+            let mz = monsterActive ? Math.floor((monster.position.z + TILE_SIZE/2) / TILE_SIZE) : -999;
+
+            for(let z = -3; z <= 3; z++) {
+                for(let x = -3; x <= 3; x++) {
+                    let cx = px + x;
+                    let cz = pz + z;
+                    if (cx === mx && cz === mz) radar += "M";
+                    else if (x === 0 && z === 0) radar += "P";
+                    else if (isWall(cx, cz)) radar += "#";
+                    else if (hasAnomaly(cx, cz)) radar += "A";
+                    else radar += ".";
+                }
+                radar += "\n";
+            }
+            return radar;
+        }
+
+        // ==========================================
+        // GESTION DU CHAT & API GEMINI (PROPRIÉTÉS DE PRODUCTION)
+        // ==========================================
+        function renderChatInput() {
+            document.getElementById('chatInputDisplay').innerHTML = currentChatInput + '<span class="blinking-cursor"></span>';
+        }
+        function closeChat() {
+            isChatMode = false;
+            currentChatInput = "";
+            document.getElementById('chatInputContainer').style.display = 'none';
+        }
+
+        function addChatLine(sender, text, isSystem = false) {
+            const hist = document.getElementById('chatHistory');
+            const div = document.createElement('div');
+            div.className = 'chat-msg ' + (isSystem ? 'system' : (sender === 'Vous' ? 'player' : 'entity'));
+            if (isSystem) {
+                div.innerText = `*** ${text} ***`;
+            } else {
+                div.innerHTML = `<strong>${sender}:</strong> ${text}`;
+            }
+            hist.appendChild(div);
+            hist.scrollTop = hist.scrollHeight;
+            
+            while(hist.children.length > 5) hist.removeChild(hist.firstChild);
+        }
+
+        function sendPlayerMessage(msg) {
+            addChatLine('Vous', msg);
+            triggerAI("Le joueur s'adresse à toi directement.", msg);
+        }
+
+        // Fonction fetch sécurisée avec Exponential Backoff pour l'API de production
+        async function fetchWithRetry(url, options, retries = 5, delay = 1000) {
+            try {
+                const res = await fetch(url, options);
+                if (res.ok) return res;
+                if (retries > 0 && (res.status >= 500 || res.status === 429)) {
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    return fetchWithRetry(url, options, retries - 1, delay * 2);
+                }
+                throw new Error(`HTTP Error: ${res.status}`);
+            } catch (err) {
+                if (retries > 0) {
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    return fetchWithRetry(url, options, retries - 1, delay * 2);
+                }
+                throw err;
+            }
+        }
+
+        async function triggerAI(reason, userMessage = "") {
+            if (!geminiApiKey) {
+                if (userMessage) addChatLine("Système", "Aucune connexion neuronale. (Clé API non configurée)", true);
+                return;
+            }
+            if (isAIPending) return;
+
+            isAIPending = true;
+            lastAITriggerTime = performance.now();
+            document.getElementById('aiStatusIndicator').style.display = 'block';
+
+            let contextData = {
+                evt: reason,
+                map: generateAsciiRadar(),
+                stamina: stamina.toFixed(0),
+                danger: monsterActive
+            };
+
+            let promptText = `Data:\n${JSON.stringify(contextData)}\n`;
+            if (userMessage) promptText += `Player: "${userMessage}"\n`;
+            promptText += `Réponds au format JSON strict.`;
+
+            aiHistory.push({ role: "user", parts: [{ text: promptText }] });
+            if (aiHistory.length > 6) aiHistory = aiHistory.slice(aiHistory.length - 6);
+
+            const payload = {
+                systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+                contents: aiHistory,
+                generationConfig: { responseMimeType: "application/json" }
+            };
+
+            try {
+                const response = await fetchWithRetry(
+                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    },
+                    5, 1000
+                );
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    addChatLine("Système", "Flux instable. Retentez plus tard.", true);
+                    isAIPending = false;
+                    document.getElementById('aiStatusIndicator').style.display = 'none';
+                    return;
+                }
+
+                if (data.candidates && data.candidates[0]) {
+                    const responseText = data.candidates[0].content.parts[0].text;
+                    aiHistory.push({ role: "model", parts: [{ text: responseText }] });
+                    
+                    try {
+                        // Épuration au cas où l'IA inclurait accidentellement du formatage Markdown
+                        let cleanJson = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
+                        const aiData = JSON.parse(cleanJson);
+                        
+                        if (aiData.message && aiData.message.trim() !== "") {
+                            addChatLine("Entité", aiData.message);
+                        }
+                        if (aiData.actions) {
+                            aiData.actions.forEach(action => executeAIAction(action));
+                        }
+                    } catch (e) {
+                        console.warn("JSON invalide reçu de l'IA, tentative d'extraction...", e);
+                    }
+                }
+            } catch (err) {
+                addChatLine("Système", "Bruit statique... Connexion perdue.", true);
+            }
+            
+            isAIPending = false;
+            document.getElementById('aiStatusIndicator').style.display = 'none';
+        }
+
+        function executeAIAction(action) {
+            if (!action || !action.command || action.command === "NONE") return;
+            
+            switch (action.command) {
+                case "FLICKER_LIGHTS":
+                    flickerEndTime = performance.now() + (action.duration || 3) * 1000;
+                    break;
+                case "SPAWN_MONSTER":
+                    if (!monsterActive) {
+                        monsterActive = true;
+                        monster.visible = true;
+                        let dist = action.distance || 20;
+                        let backward = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), euler.y);
+                        monster.position.copy(camera.position).add(backward.multiplyScalar(dist));
+                    }
+                    break;
+                case "SOUND_SCARE":
+                    if (audioCtx) {
+                        const orig = noiseGain.gain.value;
+                        noiseGain.gain.value = 0.8 * masterVolume;
+                        setTimeout(() => { if (noiseGain) noiseGain.gain.value = orig; }, 800);
+                    }
+                    break;
+            }
+        }
+
+        // ==========================================
+        // CREATION DES MATERIAUX & AUDIO
+        // ==========================================
+        function createMaterials() {
+            // Optimisation Canvas de Texture (tailles réduites 256 pour alléger la RAM/GPU)
+            const wCanvas = document.createElement('canvas'); wCanvas.width = 256; wCanvas.height = 256;
+            const wCtx = wCanvas.getContext('2d'); wCtx.fillStyle = '#dcb95e'; wCtx.fillRect(0,0,256,256);
+            for(let i=0; i<3000; i++) { 
+                wCtx.fillStyle = Math.random()>0.5 ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.04)'; 
+                wCtx.fillRect(Math.random()*256, Math.random()*256, 2, 2); 
+            }
+            wCtx.strokeStyle = 'rgba(0,0,0,0.04)'; wCtx.lineWidth = 1;
+            for(let i=0; i<256; i+=16) { wCtx.beginPath(); wCtx.moveTo(i, 0); wCtx.lineTo(i, 256); wCtx.stroke(); }
+            const wTex = new THREE.CanvasTexture(wCanvas); wTex.wrapS = wTex.wrapT = THREE.RepeatWrapping; wTex.repeat.set(1,1);
+            wallMaterial = new THREE.MeshStandardMaterial({ map: wTex, roughness: 0.9, metalness: 0.1 });
+
+            const fCanvas = document.createElement('canvas'); fCanvas.width = 128; fCanvas.height = 128;
+            const fCtx = fCanvas.getContext('2d'); fCtx.fillStyle = '#a68d3a'; fCtx.fillRect(0,0,128,128);
+            for(let i=0; i<5000; i++) { const shade = Math.random()*40; fCtx.fillStyle = `rgba(${shade},${shade},${shade},0.12)`; fCtx.fillRect(Math.random()*128, Math.random()*128, 1, 1); }
+            const fTex = new THREE.CanvasTexture(fCanvas); fTex.wrapS = fTex.wrapT = THREE.RepeatWrapping; fTex.repeat.set(50,50);
+            floorMaterial = new THREE.MeshStandardMaterial({ map: fTex, roughness: 1.0 });
+
+            const cCanvas = document.createElement('canvas'); cCanvas.width = 128; cCanvas.height = 128;
+            const cCtx = cCanvas.getContext('2d'); cCtx.fillStyle = '#e0e0e0'; cCtx.fillRect(0,0,128,128);
+            cCtx.strokeStyle = '#999'; cCtx.lineWidth = 2; cCtx.strokeRect(0,0,128,128);
+            for(let i=0; i<500; i++) { cCtx.fillStyle = 'rgba(0,0,0,0.04)'; cCtx.fillRect(Math.random()*128, Math.random()*128, 4, 4); }
+            const cTex = new THREE.CanvasTexture(cCanvas); cTex.wrapS = cTex.wrapT = THREE.RepeatWrapping; cTex.repeat.set(50,50);
+            ceilingMaterial = new THREE.MeshStandardMaterial({ map: cTex, roughness: 0.8, metalness: 0.05 });
+        }
+
+        function initAudio() {
+            if (audioCtx) return;
+            try {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                humOscillator = audioCtx.createOscillator(); 
+                humOscillator.type = 'sawtooth'; 
+                humOscillator.frequency.value = 55;
+                
+                const lpf = audioCtx.createBiquadFilter(); 
+                lpf.type = 'lowpass'; 
+                lpf.frequency.value = 150;
+                
+                humGain = audioCtx.createGain(); 
+                humGain.gain.value = 0.1 * masterVolume;
+                
+                humOscillator.connect(lpf); 
+                lpf.connect(humGain); 
+                humGain.connect(audioCtx.destination); 
+                humOscillator.start();
+
+                const noiseBuffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 2, audioCtx.sampleRate);
+                const output = noiseBuffer.getChannelData(0); 
+                for (let i = 0; i < output.length; i++) output[i] = Math.random() * 2 - 1;
+                
+                noiseNode = audioCtx.createBufferSource(); 
+                noiseNode.buffer = noiseBuffer; 
+                noiseNode.loop = true;
+                
+                const noiseFilter = audioCtx.createBiquadFilter(); 
+                noiseFilter.type = 'highpass'; 
+                noiseFilter.frequency.value = 4000;
+                
+                noiseGain = audioCtx.createGain(); 
+                noiseGain.gain.value = 0.005 * masterVolume;
+                
+                noiseNode.connect(noiseFilter); 
+                noiseFilter.connect(noiseGain); 
+                noiseGain.connect(audioCtx.destination); 
+                noiseNode.start();
+            } catch(e) {
+                console.warn("Échec de l'initialisation de l'AudioContext", e);
+            }
+        }
+
         function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.aspect = window.innerWidth / window.innerHeight; 
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
+        // ==========================================
+        // BOUCLE PRINCIPALE DE JEU (GAMELOOP OPTIMISÉE)
+        // ==========================================
         function animate() {
             requestAnimationFrame(animate);
-
             const time = performance.now();
-            const delta = (time - prevTime) / 1000;
+            // Cap delta-time pour éliminer les bugs de collision lors de chutes de framerate
+            const delta = Math.min((time - prevTime) / 1000, 0.1); 
             prevTime = time;
 
             if (controlsEnabled && !isDead) {
-                // Chronomètre d'enregistrement VHS
                 if (!startTime) startTime = time;
-                let elapsed = time - startTime;
-                let s = Math.floor(elapsed / 1000) % 60;
-                let m = Math.floor(elapsed / 60000) % 60;
-                let h = Math.floor(elapsed / 3600000);
-                let pad = (n) => n.toString().padStart(2, '0');
-                document.getElementById('vhsTime').innerText = `PLAY ▶ ${pad(h)}:${pad(m)}:${pad(s)}`;
+                let el = time - startTime;
+                document.getElementById('vhsTime').innerText = `PLAY ▶ ${String(Math.floor(el/3600000)).padStart(2,'0')}:${String(Math.floor(el/60000)%60).padStart(2,'0')}:${String(Math.floor(el/1000)%60).padStart(2,'0')}`;
 
-                // Déplacements
-                velocity.x -= velocity.x * 10.0 * delta;
-                velocity.z -= velocity.z * 10.0 * delta;
+                if (!isChatMode) {
+                    velocity.x -= velocity.x * 10.0 * delta; 
+                    velocity.z -= velocity.z * 10.0 * delta;
+                    
+                    let cSpeed = WALK_SPEED;
+                    if (isRunning && stamina > 5 && (moveForward || moveBackward || moveLeft || moveRight)) {
+                        cSpeed = RUN_SPEED; 
+                        stamina = Math.max(0, stamina - delta * 25);
+                    } else {
+                        stamina = Math.min(maxStamina, stamina + delta * 15);
+                    }
+                    
+                    const sb = document.getElementById('staminaBar'); 
+                    sb.style.width = stamina + '%'; 
+                    sb.style.backgroundColor = stamina < 25 ? '#ff3333' : '#dcb95e';
 
-                // Gestion de la course avec Stamina
-                let currentSpeed = WALK_SPEED;
-                if (isRunning && stamina > 5 && (moveForward || moveBackward || moveLeft || moveRight)) {
-                    currentSpeed = RUN_SPEED;
-                    stamina = Math.max(0, stamina - delta * 25); 
+                    let dir = new THREE.Vector3(
+                        Number(moveRight) - Number(moveLeft), 
+                        0, 
+                        Number(moveBackward) - Number(moveForward)
+                    ).normalize().applyAxisAngle(new THREE.Vector3(0,1,0), euler.y);
+                    
+                    if (moveForward || moveBackward || moveLeft || moveRight) { 
+                        velocity.x -= dir.x * cSpeed * delta; 
+                        velocity.z -= dir.z * cSpeed * delta; 
+                    }
                 } else {
-                    stamina = Math.min(maxStamina, stamina + delta * 15); 
+                    velocity.x = 0; 
+                    velocity.z = 0;
                 }
 
-                // Rendu UI de l'endurance
-                const staminaBar = document.getElementById('staminaBar');
-                staminaBar.style.width = stamina + '%';
-                if (stamina < 25) {
-                    staminaBar.style.backgroundColor = '#ff3333'; 
+                // Glissement le long des murs (Axes calculés séparément)
+                const nextX = camera.position.x - velocity.x * delta;
+                const nextZ = camera.position.z - velocity.z * delta;
+
+                if (!checkCollision(nextX, camera.position.z)) {
+                    camera.position.x = nextX;
                 } else {
-                    staminaBar.style.backgroundColor = '#dcb95e';
+                    velocity.x = 0;
                 }
 
-                let inputX = Number(moveRight) - Number(moveLeft);
-                let inputZ = Number(moveBackward) - Number(moveForward);
-                
-                direction.set(inputX, 0, inputZ).normalize();
-                direction.applyAxisAngle(new THREE.Vector3(0, 1, 0), euler.y);
-
-                if (moveForward || moveBackward || moveLeft || moveRight) {
-                    velocity.x -= direction.x * currentSpeed * delta;
-                    velocity.z -= direction.z * currentSpeed * delta;
+                if (!checkCollision(camera.position.x, nextZ)) {
+                    camera.position.z = nextZ;
+                } else {
+                    velocity.z = 0;
                 }
+                camera.position.y = PLAYER_HEIGHT;
 
-                const nextPosX = camera.position.x - velocity.x * delta;
-                const nextPosZ = camera.position.z - velocity.z * delta;
+                // Tremblement léger et réaliste de la lampe
+                flashLight.position.set(Math.sin(time*0.002)*0.15, Math.cos(time*0.0015)*0.15, 0);
 
-                if (!checkCollision({ x: nextPosX, z: camera.position.z })) camera.position.x = nextPosX;
-                else velocity.x = 0;
-
-                if (!checkCollision({ x: camera.position.x, z: nextPosZ })) camera.position.z = nextPosZ;
-                else velocity.z = 0;
-
-                camera.position.y = PLAYER_HEIGHT; 
-
-                // Lampe torche qui tremble subtilement
-                flashLight.position.x = Math.sin(time * 0.002) * 0.15;
-                flashLight.position.y = Math.cos(time * 0.0015) * 0.15;
-
-                // IA et Animation de la Brume Noire
-                if (time > monsterSpawnTime && !monsterActive) {
-                    monsterActive = true;
-                    monster.visible = true;
-                    const spawnDistX = (Math.random() > 0.5 ? 1 : -1) * (80 + Math.random() * 20);
-                    const spawnDistZ = (Math.random() > 0.5 ? 1 : -1) * (80 + Math.random() * 20);
-                    monster.position.x = camera.position.x + spawnDistX;
-                    monster.position.z = camera.position.z + spawnDistZ;
-                }
-
+                // Comportement du Monstre
                 if (monsterActive && monster) {
                     const dx = camera.position.x - monster.position.x;
                     const dz = camera.position.z - monster.position.z;
@@ -877,185 +966,112 @@
                     
                     monsterParticles.forEach(p => {
                         p.phase += delta * p.speed;
-                        p.mesh.position.x = p.offsetX + Math.sin(p.phase) * 1.8;
-                        p.mesh.position.y = p.offsetY + Math.cos(p.phase * 0.8) * 1.5;
-                        p.mesh.position.z = p.offsetZ + Math.sin(p.phase * 1.2) * 1.8;
-                        
-                        const s = 1 + Math.sin(p.phase * 0.5) * 0.25;
-                        p.mesh.scale.set(s, s, s);
+                        p.mesh.position.set(
+                            p.offsetX + Math.sin(p.phase)*1.8, 
+                            p.offsetY + Math.cos(p.phase*0.8)*1.5, 
+                            p.offsetZ + Math.sin(p.phase*1.2)*1.8
+                        );
+                        const s = 1 + Math.sin(p.phase*0.5)*0.25; 
+                        p.mesh.scale.set(s,s,s);
                     });
 
-                    if (dist > 2.5) { 
-                        let mSpeed = isRunning ? 15.0 : 10.0; 
-                        monster.position.x += (dx / dist) * mSpeed * delta; 
-                        monster.position.z += (dz / dist) * mSpeed * delta;
+                    if (dist > 2.5) {
+                        let ms = isRunning ? 16.0 : 11.0;
+                        monster.position.x += (dx/dist)*ms*delta; 
+                        monster.position.z += (dz/dist)*ms*delta;
                     } else {
-                        triggerDeath("Le brouillard noir vous a consumé.");
+                        triggerDeath();
                     }
                     
-                    monster.position.y = Math.sin(time * 0.001) * 0.4;
-
-                    // Brouillard dynamique : Noir absolu à l'approche de la brume
-                    const targetColor = new THREE.Color(0x3b3319);
-                    const blackColor = new THREE.Color(0x000000);
-                    let t = 0;
-                    if (dist < 85) {
-                        t = 1 - (dist / 85); 
-                    }
-                    targetColor.lerp(blackColor, t);
-                    scene.background.copy(targetColor);
-                    scene.fog.color.copy(targetColor);
+                    monster.position.y = Math.sin(time*0.001)*0.4;
+                    scene.background.lerpColors(new THREE.Color(0x3b3319), new THREE.Color(0x000000), dist < 85 ? 1-(dist/85) : 0);
+                    scene.fog.color.copy(scene.background);
                 } else {
-                    const normalColor = new THREE.Color(0x3b3319);
-                    scene.background.lerp(normalColor, 0.05);
-                    scene.fog.color.lerp(normalColor, 0.05);
+                    scene.background.lerp(new THREE.Color(0x3b3319), 0.05); 
+                    scene.fog.color.copy(scene.background);
                 }
 
-                // Déclenchement de l'histoire
-                if (time > nextNoteTime && noteIndex < storyNotes.length) {
-                    showSubtitle(storyNotes[noteIndex]);
-                    noteIndex++;
-                    nextNoteTime = time + 15000 + Math.random() * 25000; 
-                }
-                
-                camera.fov = baseFov + Math.sin(time * 0.001) * 1.5;
-                camera.updateProjectionMatrix();
-
-                // Gestion des anomalies et passages d'étages
+                // Détections des anomalies
                 for (const [key, obj] of activeChunks.entries()) {
                     if (obj.anomaly) {
-                        obj.anomaly.rotation.y += delta * 0.5;
+                        obj.anomaly.rotation.y += delta * 0.5; 
                         obj.anomaly.rotation.x += delta * 0.2;
-                        obj.anomaly.position.y = (WALL_HEIGHT / 2) + Math.sin(time * 0.002 + obj.anomaly.rotation.y) * 1.5;
+                        obj.anomaly.position.y = (WALL_HEIGHT/2) + Math.sin(time*0.002 + obj.anomaly.rotation.y)*1.5;
+                        const d = Math.sqrt(Math.pow(camera.position.x - obj.mesh.position.x, 2) + Math.pow(camera.position.z - obj.mesh.position.z, 2));
                         
-                        const distToAnomaly = Math.sqrt(Math.pow(camera.position.x - obj.mesh.position.x, 2) + Math.pow(camera.position.z - obj.mesh.position.z, 2));
-                        if (distToAnomaly < 3.5) triggerDeath("Votre esprit s'est fracturé face à l'anomalie.");
-                    }
-                    
-                    if (obj.isStairs) {
-                        const distToStairs = Math.sqrt(Math.pow(camera.position.x - obj.mesh.position.x, 2) + Math.pow(camera.position.z - obj.mesh.position.z, 2));
-                        if (distToStairs < 4.0) descendFloor();
-                    }
-
-                    if (obj.isStairsUp) {
-                        const distToStairsUp = Math.sqrt(Math.pow(camera.position.x - obj.mesh.position.x, 2) + Math.pow(camera.position.z - obj.mesh.position.z, 2));
-                        if (distToStairsUp < 4.0) ascendFloor();
+                        if (d < 15 && !firstAnomalySeen) {
+                            firstAnomalySeen = true;
+                            triggerAI("Le joueur vient d'apercevoir une anomalie rouge flottante.");
+                        }
+                        if (d < 3.5) triggerDeath();
                     }
                 }
 
                 updateChunks();
-                updateAudio();
+                
+                // Synthèse Audio dynamique
+                if (audioCtx && humGain && noiseGain) {
+                    humGain.gain.value = (0.1 + Math.sin(time*0.001)*0.02) * masterVolume;
+                    if (Math.random() < 0.05) {
+                        noiseGain.gain.value = (0.005 + Math.random()*0.02) * masterVolume;
+                    } else {
+                        noiseGain.gain.value += ((0.002 * masterVolume) - noiseGain.gain.value) * 0.1;
+                    }
+                }
+
+                // AI Director Tick passif (60 secondes)
+                if (geminiApiKey && !isAIPending && time - lastAITriggerTime > 60000) {
+                    triggerAI("Une minute s'est écoulée en silence. Relance le joueur avec une remarque mystique.");
+                }
             }
 
-            activeLights.forEach(lightData => {
-                if (!lightData.light) return;
-
-                // EXTINCTION SUR LE PASSAGE DU MONSTRE (DÉFINITIVE)
-                let distToMonster = 9999;
+            // Clignotement électrique des néons
+            const isFlickering = time < flickerEndTime;
+            activeLights.forEach(ld => {
+                if (!ld.light) return;
+                
+                let dMonster = 9999;
                 if (monsterActive && monster) {
-                    const lx = lightData.cx * TILE_SIZE;
-                    const lz = lightData.cz * TILE_SIZE;
-                    const mdx = lx - monster.position.x;
-                    const mdz = lz - monster.position.z;
-                    distToMonster = Math.sqrt(mdx*mdx + mdz*mdz);
+                    dMonster = Math.sqrt(Math.pow(ld.cx*TILE_SIZE - monster.position.x, 2) + Math.pow(ld.cz*TILE_SIZE - monster.position.z, 2));
                 }
+                if (dMonster < 38) ld.extinguished = true;
 
-                // Dès que la brume s'approche d'un néon, il grille définitivement
-                if (distToMonster < 38) {
-                    lightData.extinguished = true;
-                }
+                if (ld.extinguished) { ld.light.intensity = 0; return; }
+                if (ld.isAnomaly) { ld.light.intensity = 1.0 + Math.sin(time*0.003)*0.5; return; }
 
-                if (lightData.extinguished) {
-                    lightData.light.intensity = 0;
-                    return;
-                }
-
-                if (lightData.isAnomaly) {
-                    lightData.light.intensity = 1.0 + Math.sin(performance.now() * 0.003) * 0.5;
-                    return;
-                }
-
-                if (Math.random() < 0.03) {
-                    lightData.light.intensity = 0.2 + Math.random() * 0.5;
+                if (isFlickering) {
+                    ld.light.intensity = Math.random() > 0.5 ? 0 : (0.2 + Math.random()*0.6);
                 } else {
-                    lightData.light.intensity += (0.8 - lightData.light.intensity) * 0.1;
+                    if (Math.random() < 0.02) {
+                        ld.light.intensity = 0.2 + Math.random()*0.5;
+                    } else {
+                        ld.light.intensity += (0.8 - ld.light.intensity) * 0.1;
+                    }
                 }
             });
 
             renderer.render(scene, camera);
         }
 
-        function showSubtitle(text) {
-            const sub = document.getElementById('subtitle');
-            sub.innerText = text;
-            sub.style.opacity = 1;
-            setTimeout(() => { sub.style.opacity = 0; }, 6000);
-        }
-
-        function triggerDeath(reason) {
+        function triggerDeath() {
             if (isDead) return;
-            isDead = true;
-            controlsEnabled = false;
+            isDead = true; 
+            controlsEnabled = false; 
             document.exitPointerLock();
             
             const ds = document.getElementById('deathScreen');
-            document.getElementById('deathReason').innerText = reason;
-            ds.classList.remove('hidden');
-            ds.style.opacity = 1;
+            ds.classList.remove('hidden'); 
+            ds.style.opacity = 1; 
             ds.style.pointerEvents = 'auto';
+            
             document.getElementById('staminaContainer').style.display = 'none';
             document.getElementById('vhsOverlay').style.display = 'none';
+            document.getElementById('chatInterface').style.display = 'none';
             
-            if (humGain) humGain.gain.value = 0;
+            if (humGain) humGain.gain.value = 0; 
             if (noiseGain) noiseGain.gain.value = 0;
-        }
-
-        function descendFloor() {
-            currentFloor++;
-            showSubtitle(`Descente au Niveau -${currentFloor}... Le cauchemar continue.`);
             
-            for (const [key, obj] of activeChunks.entries()) {
-                scene.remove(obj.mesh);
-                if (obj.light) scene.remove(obj.light);
-            }
-            activeChunks.clear();
-            activeLights = []; 
-            
-            if (monsterActive) {
-                monster.position.set(0, 0, -1000);
-                monsterActive = false;
-                monsterSpawnTime = performance.now() + 30000;
-            }
-            
-            camera.position.set(0, PLAYER_HEIGHT, 0);
-            velocity.set(0, 0, 0);
-            updateChunks(); 
-        }
-
-        function ascendFloor() {
-            currentFloor--;
-            showSubtitle(`Ascension au Niveau ${currentFloor < 0 ? currentFloor : "0"}... L'architecture change.`);
-            
-            for (const [key, obj] of activeChunks.entries()) {
-                scene.remove(obj.mesh);
-                if (obj.light) {
-                    scene.remove(obj.light);
-                    const index = activeLights.indexOf(obj.light);
-                    if (index > -1) activeLights.splice(index, 1);
-                }
-            }
-            activeChunks.clear();
-            activeLights = []; 
-            
-            if (monsterActive) {
-                monster.position.set(0, 0, -1000);
-                monsterActive = false;
-                monsterSpawnTime = performance.now() + 30000;
-            }
-            
-            camera.position.set(0, PLAYER_HEIGHT, 0);
-            velocity.set(0, 0, 0);
-            updateChunks();
+            triggerAI("Le joueur vient de succomber dans la simulation.");
         }
     </script>
 </body>
