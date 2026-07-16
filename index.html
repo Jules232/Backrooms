@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Les Backrooms - AI Director</title>
+    <title>Les Backrooms - AI Director & Mémoire</title>
     <style>
         body {
             margin: 0; overflow: hidden; background-color: #000;
@@ -13,7 +13,7 @@
         /* Interfaces de menu */
         #blocker {
             position: absolute; width: 100%; height: 100%;
-            background-color: rgba(0, 0, 0, 0.9);
+            background-color: rgba(0, 0, 0, 0.95);
             display: flex; flex-direction: column; justify-content: center; align-items: center;
             color: #dcb95e; text-align: center; cursor: pointer; z-index: 20;
             transition: opacity 0.5s;
@@ -146,6 +146,30 @@
             position: absolute; top: 5%; right: 5%; color: #888; font-size: 12px;
             display: none; text-shadow: 1px 1px 2px #000; z-index: 4;
         }
+
+        /* Interface d'affichage du journal */
+        #journalPopup {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(18, 12, 5, 0.95); border: 3px double #dcb95e;
+            color: #f1ebd9; font-family: 'Courier New', Courier, monospace;
+            padding: 30px; width: 80%; max-width: 550px; z-index: 40;
+            display: none; flex-direction: column; box-shadow: 0 0 30px rgba(0, 0, 0, 0.9);
+            border-radius: 4px; text-shadow: 1px 1px 2px #000;
+        }
+        #journalTitle {
+            font-size: 18px; font-weight: bold; color: #ff3333; margin-bottom: 15px;
+            border-bottom: 1px solid #a68d3a; padding-bottom: 5px; text-transform: uppercase;
+        }
+        #journalContent { font-size: 15px; line-height: 1.6; max-height: 300px; overflow-y: auto; white-space: pre-line; }
+        #journalClose { align-self: flex-end; margin-top: 20px; font-size: 13px; }
+
+        /* Indicateur de prompt contextuel au sol */
+        #interactPrompt {
+            position: absolute; bottom: 25%; left: 50%; transform: translateX(-50%);
+            color: #fff; font-size: 16px; font-weight: bold; text-shadow: 0 0 10px #ff3333;
+            background: rgba(0, 0, 0, 0.7); padding: 8px 16px; border-radius: 4px;
+            border: 1px solid #ff3333; display: none; z-index: 10; pointer-events: none;
+        }
     </style>
 </head>
 <body>
@@ -172,6 +196,14 @@
         <div id="staminaBar"></div>
     </div>
 
+    <div id="interactPrompt">Appuyez sur [E] pour ramasser le document</div>
+
+    <div id="journalPopup">
+        <div id="journalTitle">Fragment de Journal Trouvé</div>
+        <div id="journalContent">Texte...</div>
+        <button class="menu-btn" id="journalClose">Fermer</button>
+    </div>
+
     <div id="deathScreen" class="hidden">
         <h1>CONSCIENCE PERDUE</h1>
         <p id="deathReason">Le brouillard noir a étouffé votre réalité.</p>
@@ -179,7 +211,8 @@
     </div>
 
     <div id="blocker">
-        <div id="mainMenu" class="hidden-panel">
+        <!-- MODIFICATION: Enlèvement de la classe hidden-panel initiale pour éviter l'écran noir de départ -->
+        <div id="mainMenu">
             <h1 id="gameTitle">ASYNC RESEARCH PROJECT</h1>
             <div id="subtitleText">Enregistrement de test - Secteur Infini</div>
             <hr style="border: 1px solid #a68d3a; width: 60%; margin: 20px auto;">
@@ -262,14 +295,15 @@
         let isDead = false;
         let stamina = 100;
         const maxStamina = 100;
-        let isExhausted = false; // Gestion stricte de l'épuisement
+        let isExhausted = false;
         let startTime = null;
 
         const activeChunks = new Map();
         let activeLights = [];
         let dynamicAnomalies = []; 
+        let dynamicJournals = []; // Nouveau : stocke les emplacements et infos des parchemins trouvés par terre
 
-        let wallMaterial, floorMaterial, ceilingMaterial;
+        let wallMaterial, floorMaterial, ceilingMaterial, journalMaterial;
         let audioCtx, humOscillator, noiseNode, humGain, noiseGain;
         let monster, flashLight;
         let monsterParticles = [];
@@ -277,11 +311,102 @@
         let monsterState = 'OFF'; 
         let monsterTargetDist = 40; 
 
-        let domStaminaBar, domVhsTime, domDeathScreen, domChatInterface, domStaminaContainer, domVhsOverlay, domScareMessage, domVignette;
+        let domStaminaBar, domVhsTime, domDeathScreen, domChatInterface, domStaminaContainer, domVhsOverlay, domScareMessage, domVignette, domInteractPrompt, domJournalPopup, domJournalContent;
 
         let flickerEndTime = 0;
         let targetFogColor = new THREE.Color(0x3b3319);
         let targetFogDensity = 0.022;
+
+        // ==========================================
+        // SYSTEME DE MEMOIRE PERSISTANTE (LONG-TERM MEMORY VECTOR)
+        // ==========================================
+        const AppMemory = {
+            db: [],
+            
+            init() {
+                try {
+                    const loaded = localStorage.getItem('backrooms_lt_memory');
+                    if (loaded) {
+                        this.db = JSON.parse(loaded);
+                    }
+                } catch(e) {
+                    console.error("Erreur de chargement de la mémoire à long terme :", e);
+                }
+            },
+            
+            save(sender, message) {
+                // Sauvegarde un enregistrement avec horodatage
+                const entry = {
+                    sender,
+                    message,
+                    time: Date.now(),
+                    keywords: this.extractKeywords(message)
+                };
+                this.db.push(entry);
+                
+                // Garder les 100 dernières interactions majeures pour éviter de saturer le localStorage
+                if (this.db.length > 100) {
+                    this.db.shift();
+                }
+                
+                try {
+                    localStorage.setItem('backrooms_lt_memory', JSON.stringify(this.db));
+                } catch(e) {
+                    console.error("Impossible de persister l'historique :", e);
+                }
+            },
+            
+            extractKeywords(text) {
+                const clean = text.toLowerCase()
+                                  .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"']/g," ")
+                                  .split(/\s+/);
+                // Exclure les pronoms communs
+                const stopwords = ["je", "tu", "il", "nous", "vous", "ils", "le", "la", "les", "un", "une", "des", "et", "ou", "mais", "pour", "dans", "par", "sur", "avec", "que", "qui", "est", "pas", "plus", "dans"];
+                return [...new Set(clean.filter(w => w.length > 3 && !stopwords.includes(w)))];
+            },
+            
+            // Simule une recherche "vectorielle" par pertinence / mots-clés
+            retrieveRelevant(currentInput, limit = 4) {
+                if (this.db.length === 0) return "";
+                const currentKeywords = this.extractKeywords(currentInput);
+                if (currentKeywords.length === 0) {
+                    // Si aucun mot clé n'est trouvé, renvoyer les 2 derniers éléments
+                    return this.db.slice(-2).map(e => `[Il y a un moment] ${e.sender}: ${e.message}`).join("\n");
+                }
+                
+                // Calculer un score de pertinence pour chaque élément du passé
+                const scored = this.db.map(entry => {
+                    let score = 0;
+                    entry.keywords.forEach(kw => {
+                        if (currentKeywords.includes(kw)) score += 1;
+                    });
+                    // On pénalise légèrement le temps pour privilégier la ressemblance sémantique, mais on garde une trace temporelle
+                    const ageInMinutes = (Date.now() - entry.time) / 60000;
+                    score += Math.max(0, 0.5 - (ageInMinutes / 60)); // bonus pour les évènements récents
+                    return { entry, score };
+                });
+                
+                // Trier par score décroissant et garder les meilleurs
+                const top = scored.filter(s => s.score > 0.1)
+                                  .sort((a,b) => b.score - a.score)
+                                  .slice(0, limit)
+                                  .map(s => {
+                                      const minAgo = Math.round((Date.now() - s.entry.time) / 60000);
+                                      const label = minAgo <= 0 ? "À l'instant" : `Il y a ${minAgo} min`;
+                                      return `[${label}] ${s.entry.sender}: ${s.entry.message}`;
+                                  });
+                                  
+                return top.join("\n");
+            }
+        };
+
+        // Liste de secours de textes de journaux
+        const DEFAULT_JOURNALS = [
+            "FRAGMENT #1 : 'Le bruit des néons est devenu insupportable. Je crois que les murs changent de place quand je cligne des yeux. Si quelqu'un trouve cette note, ne restez pas au même endroit trop longtemps.'",
+            "FRAGMENT #2 : 'L'institut ASYNC a menti. Il n'y a pas de portail de retour simple. J'ai vu une forme noire glisser à la limite de mon champ de vision... Ce n'est pas une simple simulation.'",
+            "FRAGMENT #3 : 'J'ai découvert des cubes sombres, lévitant au milieu des couloirs. Ils dégagent une sorte d'énergie froide. Ils absorbent la lumière... Ne les touchez pas, j'ai vu ce qu'il est advenu de Miller.'",
+            "FRAGMENT #4 : 'Le Maître de cet endroit joue avec mon esprit. Il répond à mes pensées, à mes paroles. Si vous lui parlez, faites attention... il se souvient de tout.'"
+        ];
 
         // ==========================================
         // SYSTÈME IA DIRECTEUR DE JEU (GEMINI)
@@ -296,7 +421,7 @@
 
         const SYSTEM_PROMPT = `Tu es "L'Entité", le Maître du Jeu d'un jeu de survie "Backrooms". Tu n'es pas une IA d'assistance. Tu es une force omniprésente, cruelle et psychologique.
 Ton but : interagir avec le joueur, le manipuler, et générer de la tension.
-Tu reçois l'état actuel du monde (radar ASCII, stats, orientation). Agis en fonction de ce qu'il regarde ou fait.
+Tu reçois l'état actuel du monde (radar ASCII, stats, orientation), ainsi qu'un rappel de souvenirs extraits de la mémoire à long terme du joueur pour que tu puisses faire référence à des choses dites il y a longtemps.
 
 RÈGLES ABSOLUES :
 1. Réponds UNIQUEMENT avec un objet JSON valide. PAS de balises Markdown \`\`\`json, juste l'objet brut.
@@ -311,10 +436,11 @@ Commandes d'actions possibles (tu peux en combiner plusieurs dans le tableau "ac
 - { "command": "SPAWN_ANOMALY", "rel_x": 0, "rel_z": -2 } : Fait apparaître un cube noir mortel (relatif au joueur).
 - { "command": "SHOW_MESSAGE", "text": "NE TE RETOURNE PAS", "duration": 3 } : Flash un texte subliminal sur l'écran.
 - { "command": "CHANGE_FOG", "color": "#ff0000", "density": 0.04, "duration": 10 } : Modifie l'ambiance visuelle.
+- { "command": "SPAWN_JOURNAL", "rel_x": 0, "rel_z": -3, "title": "Avertissement", "content": "Texte écrit sur la feuille" } : Fait apparaître une feuille de papier de journal interactive par terre avec un texte spécifique pour faire progresser l'histoire.
 
 Format JSON EXACT attendu :
 {
-  "message": "Texte de dialogue à afficher dans le chat du joueur (ou chaîne vide).",
+  "message": "Texte de dialogue à afficher dans le chat du joueur (ou chaîne vide si aucun dialogue direct).",
   "actions": [
     { "command": "FLICKER_LIGHTS", "duration": 4 }
   ]
@@ -325,6 +451,7 @@ Format JSON EXACT attendu :
         // ==========================================
         window.onload = () => {
             initDOMCache();
+            AppMemory.init(); // Initialiser la mémoire
             initMenus();
             init();
             animate();
@@ -339,9 +466,11 @@ Format JSON EXACT attendu :
             domVhsOverlay = document.getElementById('vhsOverlay');
             domScareMessage = document.getElementById('scareMessage');
             domVignette = document.getElementById('vignette');
+            domInteractPrompt = document.getElementById('interactPrompt');
+            domJournalPopup = document.getElementById('journalPopup');
+            domJournalContent = document.getElementById('journalContent');
         }
 
-        // Fetch customisé avec AbortController pour garantir qu'aucune requête ne reste bloquée
         async function fetchWithTimeout(url, options, timeout = 10000) {
             const controller = new AbortController();
             const id = setTimeout(() => controller.abort(), timeout);
@@ -543,12 +672,17 @@ Format JSON EXACT attendu :
             });
             
             document.getElementById('blocker').addEventListener('click', () => { 
-                if (!isDead && document.getElementById('settingsMenu').classList.contains('hidden-panel')) {
+                if (!isDead && document.getElementById('settingsMenu').classList.contains('hidden-panel') && domJournalPopup.style.display !== 'flex') {
                     document.body.requestPointerLock();
                 }
             });
 
             document.getElementById('retryBtn').addEventListener('click', () => { location.reload(); });
+            
+            document.getElementById('journalClose').addEventListener('click', () => {
+                domJournalPopup.style.display = 'none';
+                document.body.requestPointerLock();
+            });
 
             document.addEventListener('pointerlockchange', () => {
                 if (document.pointerLockElement === document.body) {
@@ -564,7 +698,9 @@ Format JSON EXACT attendu :
                     }
                 } else {
                     controlsEnabled = false;
-                    if (!isDead) document.getElementById('blocker').classList.remove('hidden');
+                    if (!isDead && domJournalPopup.style.display !== 'flex') {
+                        document.getElementById('blocker').classList.remove('hidden');
+                    }
                     if (audioCtx && audioCtx.state === 'running') audioCtx.suspend();
                 }
             });
@@ -582,7 +718,7 @@ Format JSON EXACT attendu :
             });
 
             document.addEventListener('keydown', (e) => {
-                if (isDead || !controlsEnabled) return;
+                if (isDead) return;
 
                 if (isChatMode) {
                     if (e.key === 'Enter') {
@@ -599,6 +735,8 @@ Format JSON EXACT attendu :
                     return;
                 }
 
+                if (!controlsEnabled) return;
+
                 if (e.key === 'Enter') {
                     e.preventDefault();
                     isChatMode = true;
@@ -606,6 +744,11 @@ Format JSON EXACT attendu :
                     document.getElementById('chatInputContainer').style.display = 'flex';
                     renderChatInput();
                     return;
+                }
+
+                // Touche E pour ramasser un journal
+                if (e.key.toLowerCase() === 'e') {
+                    checkAndInteractJournal();
                 }
 
                 switch (e.key.toLowerCase()) {
@@ -645,11 +788,17 @@ Format JSON EXACT attendu :
             return hash(cx + 500, cz + 500) < 0.008 || dynamicAnomalies.some(a => a.cx === cx && a.cz === cz); 
         }
 
+        // Nouveau : placement dynamique des journaux au sol
+        function hasJournal(cx, cz) {
+            return (hash(cx + 1000, cz + 1000) < 0.015 && !isWall(cx, cz)) || dynamicJournals.some(j => j.cx === cx && j.cz === cz && !j.picked);
+        }
+
         function generateChunk(cx, cz, key) {
             const group = new THREE.Group();
             group.position.set(cx * TILE_SIZE, 0, cz * TILE_SIZE);
             let lightObj = null;
             let anomalyObj = null;
+            let journalObj = null;
 
             if (isWall(cx, cz)) {
                 const mesh = new THREE.Mesh(new THREE.BoxGeometry(TILE_SIZE, WALL_HEIGHT, TILE_SIZE), wallMaterial);
@@ -665,19 +814,53 @@ Format JSON EXACT attendu :
                     anomalyObj = new THREE.Mesh(new THREE.OctahedronGeometry(2), new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.1, metalness: 0.8 }));
                     anomalyObj.position.set(0, WALL_HEIGHT / 2, 0);
                     group.add(anomalyObj);
-                } else if (hash(cx + 100, cz + 100) < 0.2) {
-                    lightObj = new THREE.PointLight(0xfff5b6, 0.8, 60);
-                    lightObj.position.set(cx * TILE_SIZE, WALL_HEIGHT - 0.2, cz * TILE_SIZE);
-                    scene.add(lightObj);
-                    activeLights.push({ light: lightObj, cx: cx, cz: cz, isAnomaly: false, extinguished: false });
+                } else {
+                    // Vérifier si un journal doit spawner dans ce chunk vide
+                    if (hasJournal(cx, cz)) {
+                        // Trouver ou créer le contenu du journal
+                        let journalData = dynamicJournals.find(j => j.cx === cx && j.cz === cz);
+                        if (!journalData) {
+                            const index = Math.abs(Math.floor(hash(cx, cz) * DEFAULT_JOURNALS.length));
+                            journalData = {
+                                cx, cz,
+                                title: `Rapport #${Math.abs(cx+cz)}`,
+                                content: DEFAULT_JOURNALS[index],
+                                picked: false
+                            };
+                            dynamicJournals.push(journalData);
+                        }
 
-                    const neon = new THREE.Mesh(new THREE.BoxGeometry(4, 0.1, 4), new THREE.MeshBasicMaterial({ color: 0xffffee }));
-                    neon.position.set(0, WALL_HEIGHT - 0.05, 0);
-                    group.add(neon);
+                        if (!journalData.picked) {
+                            // Créer un mesh "document par terre" rougeoyant
+                            const planeGeo = new THREE.PlaneGeometry(1.5, 2.2);
+                            journalObj = new THREE.Mesh(planeGeo, journalMaterial);
+                            journalObj.rotation.x = -Math.PI / 2;
+                            journalObj.rotation.z = hash(cx, cz) * Math.PI; // angle aléatoire
+                            journalObj.position.set(0, 0.05, 0);
+                            group.add(journalObj);
+
+                            // Petite loupiote rouge mystique au-dessus
+                            lightObj = new THREE.PointLight(0xff3333, 0.5, 5);
+                            lightObj.position.set(cx * TILE_SIZE, 0.8, cz * TILE_SIZE);
+                            scene.add(lightObj);
+                            activeLights.push({ light: lightObj, cx: cx, cz: cz, isAnomaly: false, isJournal: true });
+                        }
+                    }
+
+                    if (hash(cx + 100, cz + 100) < 0.2) {
+                        lightObj = new THREE.PointLight(0xfff5b6, 0.8, 60);
+                        lightObj.position.set(cx * TILE_SIZE, WALL_HEIGHT - 0.2, cz * TILE_SIZE);
+                        scene.add(lightObj);
+                        activeLights.push({ light: lightObj, cx: cx, cz: cz, isAnomaly: false, extinguished: false });
+
+                        const neon = new THREE.Mesh(new THREE.BoxGeometry(4, 0.1, 4), new THREE.MeshBasicMaterial({ color: 0xffffee }));
+                        neon.position.set(0, WALL_HEIGHT - 0.05, 0);
+                        group.add(neon);
+                    }
                 }
             }
             scene.add(group);
-            activeChunks.set(key, { mesh: group, light: lightObj, anomaly: anomalyObj });
+            activeChunks.set(key, { mesh: group, light: lightObj, anomaly: anomalyObj, journal: journalObj, cx, cz });
         }
 
         function updateChunks() {
@@ -699,8 +882,6 @@ Format JSON EXACT attendu :
                 if (!chunksInRadius.has(key)) {
                     scene.remove(obj.mesh);
                     obj.mesh.traverse(child => {
-                        // FIX PERF: On ne dispose QUE la géométrie ici. 
-                        // Disposer le material partagé (wallMaterial etc) rendrait les futurs murs invisibles.
                         if (child.isMesh) {
                             child.geometry.dispose();
                         }
@@ -758,11 +939,73 @@ Format JSON EXACT attendu :
                     else if (x === 0 && z === 0) radar += charP;
                     else if (isWall(cx, cz)) radar += "#";
                     else if (hasAnomaly(cx, cz)) radar += "A";
+                    else if (hasJournal(cx, cz)) radar += "J";
                     else radar += ".";
                 }
                 radar += "\n";
             }
             return radar;
+        }
+
+        // Détection et ramassage du journal devant le joueur
+        function checkAndInteractJournal() {
+            const px = Math.floor((camera.position.x + TILE_SIZE/2) / TILE_SIZE);
+            const pz = Math.floor((camera.position.z + TILE_SIZE/2) / TILE_SIZE);
+            
+            // Chercher dans les chunks actifs proches
+            for (let [key, obj] of activeChunks.entries()) {
+                if (obj.journal) {
+                    const dist = camera.position.distanceTo(new THREE.Vector3(obj.cx * TILE_SIZE, PLAYER_HEIGHT, obj.cz * TILE_SIZE));
+                    if (dist < 10) {
+                        // Trouver l'info du journal
+                        let journalData = dynamicJournals.find(j => j.cx === obj.cx && j.cz === obj.cz);
+                        if (journalData && !journalData.picked) {
+                            journalData.picked = true;
+                            
+                            // Retirer le mesh du journal et la lumière rouge du jeu
+                            obj.mesh.remove(obj.journal);
+                            obj.journal.geometry.dispose();
+                            obj.journal = null;
+                            if (obj.light) {
+                                scene.remove(obj.light);
+                                obj.light.dispose();
+                                activeLights = activeLights.filter(l => l.light !== obj.light);
+                                obj.light = null;
+                            }
+                            
+                            // Sauvegarder l'interaction dans la mémoire à long terme
+                            AppMemory.save("Explorateur", `A trouvé et lu le document '${journalData.title}': "${journalData.content}"`);
+
+                            // Afficher la popup de lecture
+                            document.exitPointerLock();
+                            domJournalPopup.style.display = 'flex';
+                            document.getElementById('journalTitle').innerText = journalData.title;
+                            domJournalContent.innerText = journalData.content;
+                            
+                            // Notifier l'IA de l'avancement
+                            triggerAI(`Le joueur a ramassé et lu le document nommé "${journalData.title}" avec le contenu: "${journalData.content}". Réagis psychologiquement à cela.`);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Met à jour l'affichage de l'aide interactive
+        function updateInteractPrompt() {
+            let showPrompt = false;
+            for (let [key, obj] of activeChunks.entries()) {
+                if (obj.journal) {
+                    const dist = camera.position.distanceTo(new THREE.Vector3(obj.cx * TILE_SIZE, PLAYER_HEIGHT, obj.cz * TILE_SIZE));
+                    if (dist < 10) {
+                        showPrompt = true;
+                        break;
+                    }
+                }
+            }
+            if (domInteractPrompt) {
+                domInteractPrompt.style.display = showPrompt ? 'block' : 'none';
+            }
         }
 
         // ==========================================
@@ -793,6 +1036,7 @@ Format JSON EXACT attendu :
 
         function sendPlayerMessage(msg) {
             addChatLine('Vous', msg);
+            AppMemory.save("Joueur", msg); // On sauve dans la mémoire à long terme locale
             triggerAI("Le joueur a parlé.", msg);
         }
 
@@ -807,18 +1051,22 @@ Format JSON EXACT attendu :
             lastAITriggerTime = performance.now();
             document.getElementById('aiStatusIndicator').style.display = 'block';
 
+            // Chercher des souvenirs pertinents à l'aide du moteur de recherche sémantique à long terme !
+            const promptContextInput = userMessage || reason;
+            const memoriesRecall = AppMemory.retrieveRelevant(promptContextInput, 3);
+
             let contextData = {
                 evt: reason,
                 map: generateAsciiRadar(),
                 stamina: stamina.toFixed(0),
-                monster: monsterState
+                monster: monsterState,
+                long_term_memories: memoriesRecall ? memoriesRecall : "Aucun souvenir marquant pour l'instant."
             };
 
-            let promptText = `Contexte:\n${JSON.stringify(contextData)}\n`;
-            if (userMessage) promptText += `Joueur: "${userMessage}"\n`;
+            let promptText = `Contexte Actuel:\n${JSON.stringify(contextData)}\n`;
+            if (userMessage) promptText += `Joueur dit: "${userMessage}"\n`;
 
             aiHistory.push({ role: "user", parts: [{ text: promptText }] });
-            // FIX: Réduction de l'historique à 6 éléments max (3 échanges) pour minimiser la dépense de tokens.
             if (aiHistory.length > 6) aiHistory = aiHistory.slice(aiHistory.length - 6);
 
             const payload = {
@@ -829,14 +1077,12 @@ Format JSON EXACT attendu :
 
             try {
                 let data = null;
-                // FIX: Implémentation robuste d'un timeout (10s) pour éviter les blocages si l'API ne répond pas.
                 let res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${geminiApiKey}`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
                 }).catch(() => null);
                 
                 if (res && res.ok) data = await res.json();
                 
-                // Fallback structuré
                 if (!data || data.error) {
                     let fallbackRes = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`, {
                         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
@@ -854,6 +1100,7 @@ Format JSON EXACT attendu :
                         
                         if (aiData.message && aiData.message.trim() !== "") {
                             addChatLine("Entité", aiData.message);
+                            AppMemory.save("L'Entité", aiData.message); // Enregistrer la parole de l'IA pour la mémoire à long terme
                         }
                         if (aiData.actions && Array.isArray(aiData.actions)) {
                             aiData.actions.forEach(action => executeAIAction(action));
@@ -863,7 +1110,7 @@ Format JSON EXACT attendu :
                     }
                 }
             } catch (err) {
-                console.warn("Erreur requête IA:", err);
+                console.warn("Erreur requete IA:", err);
             }
             
             isAIPending = false;
@@ -874,7 +1121,6 @@ Format JSON EXACT attendu :
             if (!action || !action.command) return;
             switch (action.command) {
                 case "SET_MONSTER":
-                    // FIX: Variable properly scoped pour éviter le hoisting accidentel.
                     const wasOff = (monsterState === 'OFF');
                     monsterState = action.state || 'OFF';
                     if (monsterState !== 'OFF') {
@@ -900,7 +1146,6 @@ Format JSON EXACT attendu :
                     let cz = Math.floor((camera.position.z + TILE_SIZE/2) / TILE_SIZE) + (action.rel_z || 0);
                     dynamicAnomalies.push({cx, cz});
                     
-                    // FIX: Limite du tableau d'anomalies dynamiques pour éviter les ralentissements du hash (Memory)
                     if (dynamicAnomalies.length > 20) dynamicAnomalies.shift();
                     
                     const key = `${cx},${cz}`;
@@ -911,6 +1156,30 @@ Format JSON EXACT attendu :
                         activeChunks.delete(key);
                     }
                     generateChunk(cx, cz, key);
+                    break;
+                case "SPAWN_JOURNAL":
+                    // Nouveau : Commande IA pour faire apparaître un journal par terre
+                    let jcx = Math.floor((camera.position.x + TILE_SIZE/2) / TILE_SIZE) + (action.rel_x || 0);
+                    let jcz = Math.floor((camera.position.z + TILE_SIZE/2) / TILE_SIZE) + (action.rel_z || 0);
+                    
+                    // Empêcher de spawner dans un mur
+                    if (!isWall(jcx, jcz)) {
+                        dynamicJournals.push({
+                            cx: jcx, cz: jcz,
+                            title: action.title || "Note Mystérieuse",
+                            content: action.content || "Le papier est vide...",
+                            picked: false
+                        });
+                        
+                        const jkey = `${jcx},${jcz}`;
+                        if (activeChunks.has(jkey)) {
+                            const obj = activeChunks.get(jkey);
+                            scene.remove(obj.mesh);
+                            if (obj.light) { scene.remove(obj.light); activeLights = activeLights.filter(l => l.light !== obj.light); }
+                            activeChunks.delete(jkey);
+                        }
+                        generateChunk(jcx, jcz, jkey);
+                    }
                     break;
                 case "SHOW_MESSAGE":
                     if (domScareMessage) {
@@ -957,6 +1226,15 @@ Format JSON EXACT attendu :
             for(let i=0; i<500; i++) { cCtx.fillStyle = 'rgba(0,0,0,0.04)'; cCtx.fillRect(Math.random()*128, Math.random()*128, 4, 4); }
             const cTex = new THREE.CanvasTexture(cCanvas); cTex.wrapS = cTex.wrapT = THREE.RepeatWrapping; cTex.repeat.set(50,50);
             ceilingMaterial = new THREE.MeshStandardMaterial({ map: cTex, roughness: 0.8, metalness: 0.05 });
+
+            // Nouveau : texture de journal jauni/brûlé pour le sol
+            const jCanvas = document.createElement('canvas'); jCanvas.width = 128; jCanvas.height = 128;
+            const jCtx = jCanvas.getContext('2d'); jCtx.fillStyle = '#eae2cc'; jCtx.fillRect(0,0,128,128);
+            jCtx.fillStyle = 'rgba(100,60,20,0.4)';
+            for(let i=0; i<15; i++) { jCtx.fillRect(10, 20 + i*6, 108, 2); } // lignes de faux texte
+            jCtx.strokeStyle = 'rgba(120,40,20,0.3)'; jCtx.lineWidth = 4; jCtx.strokeRect(2,2,124,124);
+            const jTex = new THREE.CanvasTexture(jCanvas);
+            journalMaterial = new THREE.MeshBasicMaterial({ map: jTex, side: THREE.DoubleSide });
         }
 
         function initAudio() {
@@ -1037,9 +1315,8 @@ Format JSON EXACT attendu :
                     
                     let cSpeed = WALK_SPEED;
                     
-                    // FIX: Gestion correcte de l'endurance (Empêche le spam de sprint quand proche de 0)
                     if (stamina <= 0) isExhausted = true;
-                    if (stamina > 30) isExhausted = false; // Nécessite 30% pour recourir après épuisement
+                    if (stamina > 30) isExhausted = false;
 
                     if (isRunning && !isExhausted && (moveForward || moveBackward || moveLeft || moveRight)) {
                         cSpeed = RUN_SPEED; 
@@ -1067,7 +1344,6 @@ Format JSON EXACT attendu :
                     velocity.x = 0; velocity.z = 0;
                 }
 
-                // Collision glissante (Slide)
                 if (!checkCollision(camera.position.x - velocity.x * delta, camera.position.z)) {
                     camera.position.x -= velocity.x * delta;
                 }
@@ -1099,7 +1375,6 @@ Format JSON EXACT attendu :
                     let ms = isRunning ? 16.0 : 11.0;
                     
                     if (monsterState === 'ATTACK') {
-                        // Fonce sur le joueur
                         if (dist > 2.5) {
                             monster.position.x += (dx/dist)*ms*delta; 
                             monster.position.z += (dz/dist)*ms*delta;
@@ -1107,7 +1382,6 @@ Format JSON EXACT attendu :
                             triggerDeath("L'Entité vous a consumé.");
                         }
                     } else if (monsterState === 'STALKER') {
-                        // Maintien de distance avec glissement fantomatique
                         if (dist > monsterTargetDist + 5) {
                             monster.position.x += (dx/dist)*ms*0.5*delta; 
                             monster.position.z += (dz/dist)*ms*0.5*delta;
@@ -1119,7 +1393,6 @@ Format JSON EXACT attendu :
                     
                     monster.position.y = Math.sin(time*0.001)*0.4;
                     
-                    // Assombrissement proche
                     if (dist < 40) {
                         const intensity = 1 - (dist / 40);
                         scene.background.lerpColors(targetFogColor, new THREE.Color(0x000000), intensity);
@@ -1150,6 +1423,7 @@ Format JSON EXACT attendu :
                 }
 
                 updateChunks();
+                updateInteractPrompt(); // Nouveau : gère l'invite d'interaction
                 
                 if (audioCtx && humGain && noiseGain) {
                     humGain.gain.value = (0.1 + Math.sin(time*0.001)*0.02) * masterVolume;
@@ -1159,7 +1433,7 @@ Format JSON EXACT attendu :
 
                 // Tick passif IA
                 if (geminiApiKey && !isAIPending && time - lastAITriggerTime > 45000) {
-                    triggerAI("Routine d'ambiance. Le joueur marche depuis un moment. Fais quelque chose pour casser la monotonie.");
+                    triggerAI("Routine d'ambiance. Le joueur marche depuis un moment. Fais quelque chose pour casser la monotonie ou sers-toi de ses souvenirs.");
                 }
             }
 
@@ -1176,6 +1450,7 @@ Format JSON EXACT attendu :
 
                 if (ld.extinguished) { ld.light.intensity = 0; return; }
                 if (ld.isAnomaly) { ld.light.intensity = 1.0 + Math.sin(time*0.003)*0.5; return; }
+                if (ld.isJournal) { ld.light.intensity = 0.4 + Math.sin(time*0.005)*0.2; return; } // Nouvelle animation lumineuse pour les parchemins
 
                 if (isFlickering) {
                     ld.light.intensity = Math.random() > 0.5 ? 0 : (0.2 + Math.random()*0.6);
@@ -1204,6 +1479,7 @@ Format JSON EXACT attendu :
             if (domVhsOverlay) domVhsOverlay.style.display = 'none';
             if (domChatInterface) domChatInterface.style.display = 'none';
             if (domScareMessage) domScareMessage.style.display = 'none';
+            if (domInteractPrompt) domInteractPrompt.style.display = 'none';
             
             if (humGain) humGain.gain.value = 0; 
             if (noiseGain) noiseGain.gain.value = 0;
