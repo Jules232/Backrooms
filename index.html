@@ -325,10 +325,10 @@ Note pour les actions :
             domVhsOverlay = document.getElementById('vhsOverlay');
         }
 
-        // Logique de validation réseau auprès de Google Gemini
+        // Logique de validation réseau auprès de Google Gemini (utilisation de gemini-1.5-flash pour une compatibilité 100% stable)
         async function checkApiKeyValid(key) {
             try {
-                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ contents: [{ parts: [{ text: "ping" }] }] })
@@ -826,8 +826,9 @@ Note pour les actions :
             };
 
             try {
+                // Utilisation du modèle stable gemini-1.5-flash pour assurer la compatibilité avec toutes les clés d'API (gratuites, GCP, etc.)
                 const response = await fetchWithRetry(
-                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
+                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
                     {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
