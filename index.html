@@ -35,20 +35,23 @@
             text-transform: uppercase; box-shadow: 0 0 10px rgba(166, 141, 58, 0.2);
         }
         .menu-btn:hover { background: #a68d3a; color: #000; box-shadow: 0 0 20px rgba(220, 185, 94, 0.6); }
+        .menu-btn:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; border-color: #666; color: #666; }
         
         .setting-row {
             margin: 15px 0; display: flex; align-items: center; justify-content: space-between;
-            width: 100%; font-size: 16px; flex-wrap: wrap;
+            width: 100%; font-size: 16px; flex-wrap: wrap; gap: 10px;
         }
         .setting-row input[type="range"] { accent-color: #dcb95e; cursor: pointer; width: 180px; }
         .setting-row input[type="password"] {
             background: rgba(20, 15, 5, 0.8); border: 1px solid #a68d3a; color: #dcb95e;
-            padding: 8px; font-family: inherit; width: 250px; outline: none;
+            padding: 8px; font-family: inherit; width: 250px; outline: none; transition: border 0.3s;
         }
+        .setting-row input[type="password"]:focus { border-color: #fff; }
         
         #apiStatus { font-size: 12px; margin-top: 5px; color: #8a773d; display: block; width: 100%; text-align: right; }
         .status-ok { color: #4caf50 !important; }
-        .status-none { color: #f44336 !important; }
+        .status-none { color: #dcb95e !important; }
+        .status-err { color: #f44336 !important; }
         
         #details { font-size: 14px; color: #a68d3a; line-height: 1.6; margin-top: 25px; }
         .hidden-panel { display: none !important; }
@@ -168,7 +171,7 @@
     </div>
 
     <div id="blocker">
-        <div id="mainMenu">
+        <div id="mainMenu" class="hidden-panel">
             <h1 id="gameTitle">ASYNC RESEARCH PROJECT</h1>
             <div id="subtitleText">Enregistrement de test - Secteur Infini</div>
             <hr style="border: 1px solid #a68d3a; width: 60%; margin: 20px auto;">
@@ -205,14 +208,16 @@
             </div>
 
             <div class="setting-row" style="margin-top: 30px;">
-                <label for="apiKeyInput" style="color: #ff9999;">Clé API Gemini (Optionnel, AI Director) :</label>
-                <div>
-                    <input type="password" id="apiKeyInput" placeholder="AI-xxxxxxxxxxxxxxxxxxx" autocomplete="off">
-                    <span id="apiStatus" class="status-none">Aucune clé. Mode hors-ligne actif.</span>
+                <label for="apiKeyInput" style="color: #ff9999;">Clé API Gemini (Optionnelle) :</label>
+                <div style="display: flex; align-items: center;">
+                    <input type="password" id="apiKeyInput" placeholder="AIzaSy..." autocomplete="off">
+                    <button class="menu-btn" id="validateApiBtn" style="margin: 0 0 0 10px; padding: 6px 12px; font-size: 14px;">Vérifier</button>
                 </div>
             </div>
-            <div style="font-size: 11px; color: #888; text-align: left; width: 100%; margin-top: -10px;">
-                *La clé est sauvegardée localement. Elle permet à l'IA d'interagir dynamiquement avec vous et de manipuler le monde.
+            <div id="apiStatus" class="status-none">Configuration initiale : entrez une clé API valide ou validez à vide pour jouer hors-ligne.</div>
+            
+            <div style="font-size: 11px; color: #888; text-align: left; width: 100%; margin-top: 15px;">
+                *La clé est sauvegardée localement. Elle permet à l'IA d'interagir dynamiquement avec vous en tant que Maître du Jeu. Sans clé, le jeu fonctionne en mode Survie Standard (Hors-ligne).
             </div>
 
             <button class="menu-btn" id="backBtn" style="margin-top: 25px;">Appliquer & Retour</button>
@@ -260,13 +265,15 @@
         let monster, flashLight;
         let monsterParticles = [];
 
-        // Événements d'environnement dynamiques
+        // Mise en cache des éléments du DOM pour optimiser la boucle de rendu
+        let domStaminaBar, domVhsTime, domDeathScreen, domChatInterface, domStaminaContainer, domVhsOverlay;
+
         let flickerEndTime = 0;
 
         // ==========================================
         // SYSTÈME IA DIRECTEUR DE JEU (GEMINI)
         // ==========================================
-        let geminiApiKey = localStorage.getItem('gemini_api_key') || "";
+        let geminiApiKey = "";
         let isChatMode = false;
         let currentChatInput = "";
         let aiHistory = [];
@@ -302,8 +309,126 @@ Note pour les actions :
         // ==========================================
         // INITIALISATION
         // ==========================================
-        init();
-        animate();
+        window.onload = () => {
+            initDOMCache();
+            initMenus();
+            init();
+            animate();
+        };
+
+        function initDOMCache() {
+            domStaminaBar = document.getElementById('staminaBar');
+            domVhsTime = document.getElementById('vhsTime');
+            domDeathScreen = document.getElementById('deathScreen');
+            domChatInterface = document.getElementById('chatInterface');
+            domStaminaContainer = document.getElementById('staminaContainer');
+            domVhsOverlay = document.getElementById('vhsOverlay');
+        }
+
+        // Logique de validation réseau auprès de Google Gemini
+        async function checkApiKeyValid(key) {
+            try {
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${key}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: "ping" }] }] })
+                });
+                
+                if (res.ok) return { valid: true };
+                if (res.status === 400) return { valid: false, reason: "Clé API invalide (Erreur 400)." };
+                if (res.status === 403) return { valid: false, reason: "Clé API non autorisée ou incorrecte (Erreur 403)." };
+                if (res.status === 429) return { valid: false, reason: "Quota API dépassé (Erreur 429)." };
+                return { valid: false, reason: `Erreur inattendue depuis l'API (${res.status}).` };
+            } catch (err) {
+                return { valid: false, reason: "Impossible de joindre les serveurs Google (Erreur Réseau)." };
+            }
+        }
+
+        function initMenus() {
+            const apiInput = document.getElementById('apiKeyInput');
+            const apiStatus = document.getElementById('apiStatus');
+            const testBtn = document.getElementById('validateApiBtn');
+            const backBtn = document.getElementById('backBtn');
+            const mainMenu = document.getElementById('mainMenu');
+            const settingsMenu = document.getElementById('settingsMenu');
+            
+            const storedKey = localStorage.getItem('gemini_api_key');
+            
+            // Premier lancement ou clé absente : forcer l'affichage des paramètres
+            if (!storedKey) {
+                mainMenu.classList.add('hidden-panel');
+                settingsMenu.classList.remove('hidden-panel');
+                apiStatus.textContent = "Configuration initiale : entrez une clé API ou validez à vide pour jouer hors-ligne.";
+                apiStatus.className = "status-none";
+            } else {
+                geminiApiKey = storedKey;
+                apiInput.value = geminiApiKey;
+                mainMenu.classList.remove('hidden-panel');
+                settingsMenu.classList.add('hidden-panel');
+                apiStatus.textContent = "Clé enregistrée. AI Director actif.";
+                apiStatus.className = "status-ok";
+            }
+
+            let isChecking = false;
+
+            async function handleApiValidation() {
+                if (isChecking) return false;
+                const key = apiInput.value.trim();
+                
+                // Si le champ est vide -> Mode Hors Ligne (autorisé)
+                if (!key) {
+                    geminiApiKey = "";
+                    localStorage.removeItem('gemini_api_key');
+                    apiStatus.textContent = "Aucune clé. Mode hors-ligne actif. L'IA sera indisponible.";
+                    apiStatus.className = "status-none";
+                    return true;
+                }
+
+                isChecking = true;
+                testBtn.textContent = "Test...";
+                testBtn.disabled = true;
+                apiStatus.textContent = "Vérification en cours auprès de Google...";
+                apiStatus.className = "status-none";
+
+                const result = await checkApiKeyValid(key);
+                
+                isChecking = false;
+                testBtn.textContent = "Vérifier";
+                testBtn.disabled = false;
+
+                if (result.valid) {
+                    geminiApiKey = key;
+                    localStorage.setItem('gemini_api_key', key);
+                    apiStatus.textContent = "Clé valide et enregistrée. AI Director prêt.";
+                    apiStatus.className = "status-ok";
+                    return true;
+                } else {
+                    apiStatus.textContent = result.reason;
+                    apiStatus.className = "status-err";
+                    return false;
+                }
+            }
+
+            testBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                handleApiValidation();
+            });
+
+            backBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const currentInputValue = apiInput.value.trim();
+                
+                // Valider la clé automatiquement si elle a été modifiée avant de quitter
+                if (currentInputValue !== geminiApiKey) {
+                    const isValid = await handleApiValidation();
+                    // Bloquer le retour au menu principal si la clé saisie est invalide
+                    if (!isValid && currentInputValue !== "") return; 
+                }
+                
+                settingsMenu.classList.add('hidden-panel');
+                mainMenu.classList.remove('hidden-panel');
+            });
+        }
 
         function init() {
             scene = new THREE.Scene();
@@ -320,7 +445,6 @@ Note pour les actions :
             createMonster();
             createMaterials();
 
-            // Sols et plafonds larges fixes pour le background
             const floorGeo = new THREE.PlaneGeometry(2000, 2000);
             const floor = new THREE.Mesh(floorGeo, floorMaterial);
             floor.rotation.x = -Math.PI / 2;
@@ -335,7 +459,7 @@ Note pour les actions :
             scene.add(new THREE.AmbientLight(0x404040, 0.6));
 
             renderer = new THREE.WebGLRenderer({ antialias: false });
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Limite pour performance mobile
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
 
@@ -377,28 +501,6 @@ Note pour les actions :
         }
 
         function setupUI() {
-            const apiInput = document.getElementById('apiKeyInput');
-            const apiStatus = document.getElementById('apiStatus');
-            apiInput.value = geminiApiKey;
-            updateApiStatus();
-
-            apiInput.addEventListener('input', (e) => {
-                geminiApiKey = e.target.value.trim();
-                if (geminiApiKey) localStorage.setItem('gemini_api_key', geminiApiKey);
-                else localStorage.removeItem('gemini_api_key');
-                updateApiStatus();
-            });
-
-            function updateApiStatus() {
-                if (geminiApiKey) {
-                    apiStatus.textContent = "Clé enregistrée. AI Director actif.";
-                    apiStatus.className = "status-ok";
-                } else {
-                    apiStatus.textContent = "Aucune clé. Mode hors-ligne actif.";
-                    apiStatus.className = "status-none";
-                }
-            }
-
             document.getElementById('sensSlider').addEventListener('input', function() {
                 mouseSensitivity = baseSensitivity * parseFloat(this.value);
                 document.getElementById('sensValue').innerText = Math.round(parseFloat(this.value) * 100) + '%';
@@ -408,8 +510,8 @@ Note pour les actions :
                 masterVolume = parseFloat(this.value);
                 document.getElementById('volValue').innerText = Math.round(masterVolume * 100) + '%';
                 if (audioCtx) {
-                    humGain.gain.value = 0.1 * masterVolume;
-                    noiseGain.gain.value = 0.005 * masterVolume;
+                    if (humGain) humGain.gain.value = 0.1 * masterVolume;
+                    if (noiseGain) noiseGain.gain.value = 0.005 * masterVolume;
                 }
             });
 
@@ -422,12 +524,6 @@ Note pour les actions :
                 e.stopPropagation(); 
                 document.getElementById('mainMenu').classList.add('hidden-panel'); 
                 document.getElementById('settingsMenu').classList.remove('hidden-panel'); 
-            });
-            
-            document.getElementById('backBtn').addEventListener('click', (e) => { 
-                e.stopPropagation(); 
-                document.getElementById('settingsMenu').classList.add('hidden-panel'); 
-                document.getElementById('mainMenu').classList.remove('hidden-panel'); 
             });
             
             document.getElementById('blocker').addEventListener('click', () => { 
@@ -444,9 +540,9 @@ Note pour les actions :
                 if (document.pointerLockElement === document.body) {
                     controlsEnabled = true;
                     document.getElementById('blocker').classList.add('hidden');
-                    document.getElementById('staminaContainer').style.display = 'block';
-                    document.getElementById('vhsOverlay').style.display = 'block';
-                    document.getElementById('chatInterface').style.display = 'flex';
+                    domStaminaContainer.style.display = 'block';
+                    domVhsOverlay.style.display = 'block';
+                    domChatInterface.style.display = 'flex';
                     initAudio();
                     if (geminiApiKey && aiHistory.length === 0) {
                         triggerAI("Le joueur vient d'entrer dans les Backrooms.");
@@ -472,13 +568,10 @@ Note pour les actions :
             document.addEventListener('keydown', (e) => {
                 if (isDead || !controlsEnabled) return;
 
-                // GESTION DU CHAT INTERNE
                 if (isChatMode) {
                     if (e.key === 'Enter') {
                         e.preventDefault();
-                        if (currentChatInput.trim().length > 0) {
-                            sendPlayerMessage(currentChatInput.trim());
-                        }
+                        if (currentChatInput.trim().length > 0) sendPlayerMessage(currentChatInput.trim());
                         closeChat();
                     } else if (e.key === 'Escape') {
                         e.preventDefault();
@@ -495,7 +588,6 @@ Note pour les actions :
                     return;
                 }
 
-                // Ouverture du chat
                 if (e.key === 'Enter') {
                     e.preventDefault();
                     isChatMode = true;
@@ -530,7 +622,6 @@ Note pour les actions :
         // MOTEUR DE GÉNÉRATION & RADAR
         // ==========================================
         function hash(x, z) {
-            // Précision flottante optimisée pour éviter les répétitions infinies trop proches
             let n = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453123;
             return n - Math.floor(n);
         }
@@ -549,12 +640,8 @@ Note pour les actions :
             let lightObj = null;
             let anomalyObj = null;
 
-            const wallBoxGeo = new THREE.BoxGeometry(TILE_SIZE, WALL_HEIGHT, TILE_SIZE);
-            const neonGeo = new THREE.BoxGeometry(4, 0.1, 4);
-            const octaGeo = new THREE.OctahedronGeometry(2);
-
             if (isWall(cx, cz)) {
-                const mesh = new THREE.Mesh(wallBoxGeo, wallMaterial);
+                const mesh = new THREE.Mesh(new THREE.BoxGeometry(TILE_SIZE, WALL_HEIGHT, TILE_SIZE), wallMaterial);
                 mesh.position.y = WALL_HEIGHT / 2;
                 group.add(mesh);
             } else {
@@ -564,7 +651,7 @@ Note pour les actions :
                     scene.add(lightObj);
                     activeLights.push({ light: lightObj, cx: cx, cz: cz, isAnomaly: true });
 
-                    anomalyObj = new THREE.Mesh(octaGeo, new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.1, metalness: 0.8 }));
+                    anomalyObj = new THREE.Mesh(new THREE.OctahedronGeometry(2), new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.1, metalness: 0.8 }));
                     anomalyObj.position.set(0, WALL_HEIGHT / 2, 0);
                     group.add(anomalyObj);
                 } else if (hash(cx + 100, cz + 100) < 0.2) {
@@ -573,7 +660,7 @@ Note pour les actions :
                     scene.add(lightObj);
                     activeLights.push({ light: lightObj, cx: cx, cz: cz, isAnomaly: false, extinguished: false });
 
-                    const neon = new THREE.Mesh(neonGeo, new THREE.MeshBasicMaterial({ color: 0xffffee }));
+                    const neon = new THREE.Mesh(new THREE.BoxGeometry(4, 0.1, 4), new THREE.MeshBasicMaterial({ color: 0xffffee }));
                     neon.position.set(0, WALL_HEIGHT - 0.05, 0);
                     group.add(neon);
                 }
@@ -597,7 +684,6 @@ Note pour les actions :
                 }
             }
 
-            // Libération propre des géométries et lumières pour éviter les memory leaks
             for (const [key, obj] of activeChunks.entries()) {
                 if (!chunksInRadius.has(key)) {
                     scene.remove(obj.mesh);
@@ -633,7 +719,6 @@ Note pour les actions :
             return false;
         }
 
-        // Radar ASCII compact et propre
         function generateAsciiRadar() {
             let radar = "";
             let px = Math.floor((camera.position.x + TILE_SIZE/2) / TILE_SIZE);
@@ -658,7 +743,7 @@ Note pour les actions :
         }
 
         // ==========================================
-        // GESTION DU CHAT & API GEMINI (PROPRIÉTÉS DE PRODUCTION)
+        // GESTION DU CHAT & API GEMINI
         // ==========================================
         function renderChatInput() {
             document.getElementById('chatInputDisplay').innerHTML = currentChatInput + '<span class="blinking-cursor"></span>';
@@ -680,7 +765,6 @@ Note pour les actions :
             }
             hist.appendChild(div);
             hist.scrollTop = hist.scrollHeight;
-            
             while(hist.children.length > 5) hist.removeChild(hist.firstChild);
         }
 
@@ -689,7 +773,6 @@ Note pour les actions :
             triggerAI("Le joueur s'adresse à toi directement.", msg);
         }
 
-        // Fonction fetch sécurisée avec Exponential Backoff pour l'API de production
         async function fetchWithRetry(url, options, retries = 5, delay = 1000) {
             try {
                 const res = await fetch(url, options);
@@ -709,8 +792,11 @@ Note pour les actions :
         }
 
         async function triggerAI(reason, userMessage = "") {
+            // Sécurité primordiale: bloquer la requête et informer le joueur s'il n'y a aucune clé
             if (!geminiApiKey) {
-                if (userMessage) addChatLine("Système", "Aucune connexion neuronale. (Clé API non configurée)", true);
+                if (userMessage) {
+                    addChatLine("Système", "IA indisponible (Mode Hors-Ligne). L'entité ne peut pas vous entendre.", true);
+                }
                 return;
             }
             if (isAIPending) return;
@@ -741,19 +827,19 @@ Note pour les actions :
 
             try {
                 const response = await fetchWithRetry(
-                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
+                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${geminiApiKey}`,
                     {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
                     },
-                    5, 1000
+                    3, 1000
                 );
                 
-                const data = await response.json();
+                const data = await response.json().catch(() => null);
                 
-                if (data.error) {
-                    addChatLine("Système", "Flux instable. Retentez plus tard.", true);
+                if (!data || data.error) {
+                    addChatLine("Système", "Flux de conscience instable. Retentez plus tard.", true);
                     isAIPending = false;
                     document.getElementById('aiStatusIndicator').style.display = 'none';
                     return;
@@ -764,7 +850,6 @@ Note pour les actions :
                     aiHistory.push({ role: "model", parts: [{ text: responseText }] });
                     
                     try {
-                        // Épuration au cas où l'IA inclurait accidentellement du formatage Markdown
                         let cleanJson = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
                         const aiData = JSON.parse(cleanJson);
                         
@@ -775,11 +860,11 @@ Note pour les actions :
                             aiData.actions.forEach(action => executeAIAction(action));
                         }
                     } catch (e) {
-                        console.warn("JSON invalide reçu de l'IA, tentative d'extraction...", e);
+                        console.warn("L'IA a retourné un JSON invalide. Ignoré.");
                     }
                 }
             } catch (err) {
-                addChatLine("Système", "Bruit statique... Connexion perdue.", true);
+                addChatLine("Système", "Bruit statique... La connexion neuronale a échoué.", true);
             }
             
             isAIPending = false;
@@ -788,7 +873,6 @@ Note pour les actions :
 
         function executeAIAction(action) {
             if (!action || !action.command || action.command === "NONE") return;
-            
             switch (action.command) {
                 case "FLICKER_LIGHTS":
                     flickerEndTime = performance.now() + (action.duration || 3) * 1000;
@@ -803,7 +887,7 @@ Note pour les actions :
                     }
                     break;
                 case "SOUND_SCARE":
-                    if (audioCtx) {
+                    if (audioCtx && noiseGain) {
                         const orig = noiseGain.gain.value;
                         noiseGain.gain.value = 0.8 * masterVolume;
                         setTimeout(() => { if (noiseGain) noiseGain.gain.value = orig; }, 800);
@@ -816,7 +900,6 @@ Note pour les actions :
         // CREATION DES MATERIAUX & AUDIO
         // ==========================================
         function createMaterials() {
-            // Optimisation Canvas de Texture (tailles réduites 256 pour alléger la RAM/GPU)
             const wCanvas = document.createElement('canvas'); wCanvas.width = 256; wCanvas.height = 256;
             const wCtx = wCanvas.getContext('2d'); wCtx.fillStyle = '#dcb95e'; wCtx.fillRect(0,0,256,256);
             for(let i=0; i<3000; i++) { 
@@ -898,14 +981,13 @@ Note pour les actions :
         function animate() {
             requestAnimationFrame(animate);
             const time = performance.now();
-            // Cap delta-time pour éliminer les bugs de collision lors de chutes de framerate
             const delta = Math.min((time - prevTime) / 1000, 0.1); 
             prevTime = time;
 
             if (controlsEnabled && !isDead) {
                 if (!startTime) startTime = time;
                 let el = time - startTime;
-                document.getElementById('vhsTime').innerText = `PLAY ▶ ${String(Math.floor(el/3600000)).padStart(2,'0')}:${String(Math.floor(el/60000)%60).padStart(2,'0')}:${String(Math.floor(el/1000)%60).padStart(2,'0')}`;
+                if (domVhsTime) domVhsTime.innerText = `PLAY ▶ ${String(Math.floor(el/3600000)).padStart(2,'0')}:${String(Math.floor(el/60000)%60).padStart(2,'0')}:${String(Math.floor(el/1000)%60).padStart(2,'0')}`;
 
                 if (!isChatMode) {
                     velocity.x -= velocity.x * 10.0 * delta; 
@@ -919,9 +1001,10 @@ Note pour les actions :
                         stamina = Math.min(maxStamina, stamina + delta * 15);
                     }
                     
-                    const sb = document.getElementById('staminaBar'); 
-                    sb.style.width = stamina + '%'; 
-                    sb.style.backgroundColor = stamina < 25 ? '#ff3333' : '#dcb95e';
+                    if (domStaminaBar) {
+                        domStaminaBar.style.width = stamina + '%'; 
+                        domStaminaBar.style.backgroundColor = stamina < 25 ? '#ff3333' : '#dcb95e';
+                    }
 
                     let dir = new THREE.Vector3(
                         Number(moveRight) - Number(moveLeft), 
@@ -938,7 +1021,6 @@ Note pour les actions :
                     velocity.z = 0;
                 }
 
-                // Glissement le long des murs (Axes calculés séparément)
                 const nextX = camera.position.x - velocity.x * delta;
                 const nextZ = camera.position.z - velocity.z * delta;
 
@@ -955,10 +1037,8 @@ Note pour les actions :
                 }
                 camera.position.y = PLAYER_HEIGHT;
 
-                // Tremblement léger et réaliste de la lampe
                 flashLight.position.set(Math.sin(time*0.002)*0.15, Math.cos(time*0.0015)*0.15, 0);
 
-                // Comportement du Monstre
                 if (monsterActive && monster) {
                     const dx = camera.position.x - monster.position.x;
                     const dz = camera.position.z - monster.position.z;
@@ -991,7 +1071,6 @@ Note pour les actions :
                     scene.fog.color.copy(scene.background);
                 }
 
-                // Détections des anomalies
                 for (const [key, obj] of activeChunks.entries()) {
                     if (obj.anomaly) {
                         obj.anomaly.rotation.y += delta * 0.5; 
@@ -1009,7 +1088,6 @@ Note pour les actions :
 
                 updateChunks();
                 
-                // Synthèse Audio dynamique
                 if (audioCtx && humGain && noiseGain) {
                     humGain.gain.value = (0.1 + Math.sin(time*0.001)*0.02) * masterVolume;
                     if (Math.random() < 0.05) {
@@ -1019,13 +1097,12 @@ Note pour les actions :
                     }
                 }
 
-                // AI Director Tick passif (60 secondes)
+                // AI Director Tick
                 if (geminiApiKey && !isAIPending && time - lastAITriggerTime > 60000) {
                     triggerAI("Une minute s'est écoulée en silence. Relance le joueur avec une remarque mystique.");
                 }
             }
 
-            // Clignotement électrique des néons
             const isFlickering = time < flickerEndTime;
             activeLights.forEach(ld => {
                 if (!ld.light) return;
@@ -1059,14 +1136,15 @@ Note pour les actions :
             controlsEnabled = false; 
             document.exitPointerLock();
             
-            const ds = document.getElementById('deathScreen');
-            ds.classList.remove('hidden'); 
-            ds.style.opacity = 1; 
-            ds.style.pointerEvents = 'auto';
+            if (domDeathScreen) {
+                domDeathScreen.classList.remove('hidden'); 
+                domDeathScreen.style.opacity = 1; 
+                domDeathScreen.style.pointerEvents = 'auto';
+            }
             
-            document.getElementById('staminaContainer').style.display = 'none';
-            document.getElementById('vhsOverlay').style.display = 'none';
-            document.getElementById('chatInterface').style.display = 'none';
+            if (domStaminaContainer) domStaminaContainer.style.display = 'none';
+            if (domVhsOverlay) domVhsOverlay.style.display = 'none';
+            if (domChatInterface) domChatInterface.style.display = 'none';
             
             if (humGain) humGain.gain.value = 0; 
             if (noiseGain) noiseGain.gain.value = 0;
