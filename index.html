@@ -5,220 +5,73 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Les Backrooms - AI Director & Mémoire</title>
     <style>
-        body {
-            margin: 0; overflow: hidden; background-color: #000;
-            font-family: 'Courier New', Courier, monospace; user-select: none;
-        }
-        
-        /* Interfaces de menu */
-        #blocker {
-            position: absolute; width: 100%; height: 100%;
-            background-color: rgba(0, 0, 0, 0.95);
-            display: flex; flex-direction: column; justify-content: center; align-items: center;
-            color: #dcb95e; text-align: center; cursor: pointer; z-index: 20;
-            transition: opacity 0.5s;
-        }
-        #mainMenu, #settingsMenu {
-            display: flex; flex-direction: column; justify-content: center; align-items: center;
-            width: 90%; max-width: 700px;
-        }
-        #gameTitle {
-            font-size: 32px; letter-spacing: 5px; margin: 0;
-            text-shadow: 0 0 15px #dcb95e; font-weight: bold;
-        }
-        #subtitleText { color: #8a773d; font-size: 14px; margin-top: 5px; font-style: italic; }
-        
-        .menu-btn {
-            background: transparent; color: #dcb95e; border: 2px solid #a68d3a;
-            padding: 12px 30px; font-family: 'Courier New', Courier, monospace; font-size: 18px;
-            font-weight: bold; cursor: pointer; margin: 10px; transition: all 0.3s ease;
-            text-transform: uppercase; box-shadow: 0 0 10px rgba(166, 141, 58, 0.2);
-        }
-        .menu-btn:hover { background: #a68d3a; color: #000; box-shadow: 0 0 20px rgba(220, 185, 94, 0.6); }
-        .menu-btn:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; border-color: #666; color: #666; }
-        
-        .setting-row {
-            margin: 15px 0; display: flex; align-items: center; justify-content: space-between;
-            width: 100%; font-size: 16px; flex-wrap: wrap; gap: 10px;
-        }
-        .setting-row input[type="range"] { accent-color: #dcb95e; cursor: pointer; width: 180px; }
-        .setting-row input[type="password"] {
-            background: rgba(20, 15, 5, 0.8); border: 1px solid #a68d3a; color: #dcb95e;
-            padding: 8px; font-family: inherit; width: 250px; outline: none; transition: border 0.3s;
-        }
-        .setting-row input[type="password"]:focus { border-color: #fff; }
-        
-        #apiStatus { font-size: 12px; margin-top: 5px; color: #8a773d; display: block; width: 100%; text-align: right; }
-        .status-ok { color: #4caf50 !important; }
-        .status-none { color: #dcb95e !important; }
-        .status-err { color: #f44336 !important; }
-        
-        #details { font-size: 14px; color: #a68d3a; line-height: 1.6; margin-top: 25px; }
-        .hidden-panel { display: none !important; }
-        .hidden { opacity: 0; pointer-events: none; }
-        
-        /* Effets HUD et Écran de mort */
-        #deathScreen {
-            position: absolute; width: 100%; height: 100%; background-color: rgba(5, 0, 0, 0.98);
-            display: flex; flex-direction: column; justify-content: center; align-items: center;
-            color: #ff3333; text-align: center; z-index: 30; opacity: 0; transition: opacity 2s; pointer-events: none;
-        }
-        #deathScreen h1 { font-size: 55px; margin-bottom: 10px; text-shadow: 0 0 20px red; letter-spacing: 5px; }
-        #deathScreen button { 
-            margin-top: 30px; padding: 15px 35px; background: black; color: red; border: 2px solid red; 
-            font-family: inherit; font-size: 20px; cursor: pointer; text-transform: uppercase;
-        }
-        #deathScreen button:hover { background: red; color: black; box-shadow: 0 0 25px red; }
-
-        #crosshair {
-            position: absolute; top: 50%; left: 50%; width: 4px; height: 4px;
-            background-color: rgba(255, 255, 255, 0.3); border-radius: 50%;
-            transform: translate(-50%, -50%); z-index: 5; pointer-events: none;
-        }
-
-        /* Message effrayant du Game Master */
-        #scareMessage {
-            position: absolute; top: 30%; left: 0; width: 100%; text-align: center;
-            color: #fff; font-size: 40px; font-weight: bold; text-shadow: 0 0 20px #ff0000, 0 0 10px #ff0000;
-            z-index: 25; pointer-events: none; opacity: 0; transition: opacity 0.5s; letter-spacing: 8px;
-        }
-
-        /* Effets VHS */
-        #vignette {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: radial-gradient(circle, rgba(0,0,0,0) 30%, rgba(0,0,0,0.95) 100%);
-            pointer-events: none; z-index: 2; transition: background 2s;
-        }
-        #scanlines {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.3) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.04), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.04));
-            background-size: 100% 4px, 6px 100%; pointer-events: none; z-index: 3; opacity: 0.6;
-        }
-
-        #vhsOverlay {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none; z-index: 4; color: rgba(255, 255, 255, 0.7);
-            text-shadow: 1px 1px 2px #000; font-size: 18px; display: none;
-        }
-        #recBadge { position: absolute; top: 5%; left: 5%; }
-        #recDot { color: red; animation: blink 1s infinite; }
-        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
-        #vhsTime { position: absolute; bottom: 5%; right: 5%; }
-
-        #staminaContainer {
-            position: absolute; bottom: 5%; left: 50%; transform: translateX(-50%);
-            width: 250px; height: 12px; background: rgba(20, 15, 5, 0.6);
-            border: 2px solid #a68d3a; border-radius: 6px; z-index: 9; display: none; padding: 2px; box-sizing: border-box;
-        }
-        #staminaBar { width: 100%; height: 100%; background: #dcb95e; border-radius: 3px; transition: width 0.1s linear; }
-
-        /* Interface de Chat (IA) */
-        #chatInterface {
-            position: absolute; bottom: 12%; left: 5%; width: 40%; max-width: 500px;
-            z-index: 15; display: none; flex-direction: column; justify-content: flex-end;
-            pointer-events: none;
-        }
-        #chatHistory {
-            display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px;
-            max-height: 250px; overflow-y: hidden; text-shadow: 1px 1px 2px #000;
-        }
-        .chat-msg {
-            background: rgba(0, 0, 0, 0.6); padding: 8px 12px; border-left: 3px solid #dcb95e;
-            color: #fff; font-size: 15px; border-radius: 0 4px 4px 0; word-wrap: break-word;
-            animation: fadeIn 0.3s ease-in-out;
-        }
-        .chat-msg.entity { border-left-color: #ff3333; color: #ff9999; font-style: italic; }
-        .chat-msg.system { border-left-color: #888; color: #bbb; font-size: 13px; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        
-        #chatInputContainer {
-            display: none; background: rgba(20, 15, 5, 0.85); border: 1px solid #dcb95e;
-            padding: 10px; border-radius: 4px; align-items: center;
-        }
-        #chatPrefix { color: #dcb95e; margin-right: 10px; font-weight: bold; }
-        #chatInputDisplay {
-            color: #fff; font-family: inherit; font-size: 16px; white-space: pre-wrap;
-            min-height: 20px; flex-grow: 1; word-wrap: break-word;
-        }
-        .blinking-cursor { display: inline-block; width: 8px; height: 16px; background: #dcb95e; animation: blink 1s infinite; vertical-align: bottom; margin-left: 2px; }
-        
-        #aiStatusIndicator {
-            position: absolute; top: 5%; right: 5%; color: #888; font-size: 12px;
-            display: none; text-shadow: 1px 1px 2px #000; z-index: 4;
-        }
-
-        /* Interface d'affichage du journal */
-        #journalPopup {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(18, 12, 5, 0.95); border: 3px double #dcb95e;
-            color: #f1ebd9; font-family: 'Courier New', Courier, monospace;
-            padding: 30px; width: 80%; max-width: 550px; z-index: 40;
-            display: none; flex-direction: column; box-shadow: 0 0 30px rgba(0, 0, 0, 0.9);
-            border-radius: 4px; text-shadow: 1px 1px 2px #000;
-        }
-        #journalTitle {
-            font-size: 18px; font-weight: bold; color: #ff3333; margin-bottom: 15px;
-            border-bottom: 1px solid #a68d3a; padding-bottom: 5px; text-transform: uppercase;
-        }
-        #journalContent { font-size: 15px; line-height: 1.6; max-height: 300px; overflow-y: auto; white-space: pre-line; }
-        #journalClose { align-self: flex-end; margin-top: 20px; font-size: 13px; }
-
-        /* Indicateur de prompt contextuel au sol */
-        #interactPrompt {
-            position: absolute; bottom: 25%; left: 50%; transform: translateX(-50%);
-            color: #fff; font-size: 16px; font-weight: bold; text-shadow: 0 0 10px #ff3333;
-            background: rgba(0, 0, 0, 0.7); padding: 8px 16px; border-radius: 4px;
-            border: 1px solid #ff3333; display: none; z-index: 10; pointer-events: none;
-        }
+        body{margin:0;overflow:hidden;background-color:#000;font-family:'Courier New',Courier,monospace;user-select:none}
+        #blocker{position:absolute;width:100%;height:100%;background-color:rgba(0,0,0,.95);display:flex;flex-direction:column;justify-content:center;align-items:center;color:#dcb95e;text-align:center;cursor:pointer;z-index:20;transition:opacity .5s}
+        #mainMenu,#settingsMenu{display:flex;flex-direction:column;justify-content:center;align-items:center;width:90%;max-width:700px}
+        #gameTitle{font-size:32px;letter-spacing:5px;margin:0;text-shadow:0 0 15px #dcb95e;font-weight:700}
+        #subtitleText{color:#8a773d;font-size:14px;margin-top:5px;font-style:italic}
+        .menu-btn{background:0 0;color:#dcb95e;border:2px solid #a68d3a;padding:12px 30px;font-family:'Courier New',Courier,monospace;font-size:18px;font-weight:700;cursor:pointer;margin:10px;transition:all .3s ease;text-transform:uppercase;box-shadow:0 0 10px rgba(166,141,58,.2)}
+        .menu-btn:hover{background:#a68d3a;color:#000;box-shadow:0 0 20px rgba(220,185,94,.6)}
+        .menu-btn:disabled{opacity:.5;cursor:not-allowed;box-shadow:none;border-color:#666;color:#666}
+        .setting-row{margin:15px 0;display:flex;align-items:center;justify-content:space-between;width:100%;font-size:16px;flex-wrap:wrap;gap:10px}
+        .setting-row input[type=range]{accent-color:#dcb95e;cursor:pointer;width:180px}
+        .setting-row input[type=password]{background:rgba(20,15,5,.8);border:1px solid #a68d3a;color:#dcb95e;padding:8px;font-family:inherit;width:250px;outline:0;transition:border .3s}
+        .setting-row input[type=password]:focus{border-color:#fff}
+        #apiStatus{font-size:12px;margin-top:5px;display:block;width:100%;text-align:right}
+        .status-ok{color:#4caf50!important} .status-none{color:#dcb95e!important} .status-err{color:#f44336!important}
+        #details{font-size:14px;color:#a68d3a;line-height:1.6;margin-top:25px}
+        .hidden-panel{display:none!important} .hidden{opacity:0;pointer-events:none}
+        #deathScreen{position:absolute;width:100%;height:100%;background-color:rgba(5,0,0,.98);display:flex;flex-direction:column;justify-content:center;align-items:center;color:#f33;text-align:center;z-index:30;opacity:0;transition:opacity 2s;pointer-events:none}
+        #deathScreen h1{font-size:55px;margin-bottom:10px;text-shadow:0 0 20px red;letter-spacing:5px}
+        #deathScreen button{margin-top:30px;padding:15px 35px;background:#000;color:red;border:2px solid red;font-family:inherit;font-size:20px;cursor:pointer;text-transform:uppercase}
+        #deathScreen button:hover{background:red;color:#000;box-shadow:0 0 25px red}
+        #crosshair{position:absolute;top:50%;left:50%;width:4px;height:4px;background-color:rgba(255,255,255,.3);border-radius:50%;transform:translate(-50%,-50%);z-index:5;pointer-events:none}
+        #scareMessage{position:absolute;top:30%;left:0;width:100%;text-align:center;color:#fff;font-size:40px;font-weight:700;text-shadow:0 0 20px #f00,0 0 10px #f00;z-index:25;pointer-events:none;opacity:0;transition:opacity .5s;letter-spacing:8px}
+        #vignette{position:absolute;top:0;left:0;width:100%;height:100%;background:radial-gradient(circle,rgba(0,0,0,0) 30%,rgba(0,0,0,.95) 100%);pointer-events:none;z-index:2;transition:background 2s}
+        #scanlines{position:absolute;top:0;left:0;width:100%;height:100%;background:linear-gradient(rgba(18,16,16,0) 50%,rgba(0,0,0,.3) 50%),linear-gradient(90deg,rgba(255,0,0,.04),rgba(0,255,0,.01),rgba(0,0,255,.04));background-size:100% 4px,6px 100%;pointer-events:none;z-index:3;opacity:.6}
+        #vhsOverlay{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:4;color:rgba(255,255,255,.7);text-shadow:1px 1px 2px #000;font-size:18px;display:none}
+        #recBadge{position:absolute;top:5%;left:5%} #recDot{color:red;animation:blink 1s infinite}
+        @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+        #vhsTime{position:absolute;bottom:5%;right:5%}
+        #staminaContainer{position:absolute;bottom:5%;left:50%;transform:translateX(-50%);width:250px;height:12px;background:rgba(20,15,5,.6);border:2px solid #a68d3a;border-radius:6px;z-index:9;display:none;padding:2px;box-sizing:border-box}
+        #staminaBar{width:100%;height:100%;background:#dcb95e;border-radius:3px;transition:width .1s linear}
+        #chatInterface{position:absolute;bottom:12%;left:5%;width:40%;max-width:500px;z-index:15;display:none;flex-direction:column;justify-content:flex-end;pointer-events:none}
+        #chatHistory{display:flex;flex-direction:column;gap:8px;margin-bottom:10px;max-height:250px;overflow-y:hidden;text-shadow:1px 1px 2px #000}
+        .chat-msg{background:rgba(0,0,0,.6);padding:8px 12px;border-left:3px solid #dcb95e;color:#fff;font-size:15px;border-radius:0 4px 4px 0;word-wrap:break-word;animation:fadeIn .3s ease-in-out}
+        .chat-msg.entity{border-left-color:#f33;color:#f99;font-style:italic}
+        .chat-msg.system{border-left-color:#888;color:#bbb;font-size:13px}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+        #chatInputContainer{display:none;background:rgba(20,15,5,.85);border:1px solid #dcb95e;padding:10px;border-radius:4px;align-items:center}
+        #chatPrefix{color:#dcb95e;margin-right:10px;font-weight:700}
+        #chatInputDisplay{color:#fff;font-family:inherit;font-size:16px;white-space:pre-wrap;min-height:20px;flex-grow:1;word-wrap:break-word}
+        .blinking-cursor{display:inline-block;width:8px;height:16px;background:#dcb95e;animation:blink 1s infinite;vertical-align:bottom;margin-left:2px}
+        #aiStatusIndicator{position:absolute;top:5%;right:5%;color:#888;font-size:12px;display:none;text-shadow:1px 1px 2px #000;z-index:4}
+        #journalPopup{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(18,12,5,.95);border:3px double #dcb95e;color:#f1ebd9;padding:30px;width:80%;max-width:550px;z-index:40;display:none;flex-direction:column;box-shadow:0 0 30px rgba(0,0,0,.9);border-radius:4px;text-shadow:1px 1px 2px #000}
+        #journalTitle{font-size:18px;font-weight:700;color:#f33;margin-bottom:15px;border-bottom:1px solid #a68d3a;padding-bottom:5px;text-transform:uppercase}
+        #journalContent{font-size:15px;line-height:1.6;max-height:300px;overflow-y:auto;white-space:pre-line}
+        #journalClose{align-self:flex-end;margin-top:20px;font-size:13px}
+        #interactPrompt{position:absolute;bottom:25%;left:50%;transform:translateX(-50%);color:#fff;font-size:16px;font-weight:700;text-shadow:0 0 10px #f33;background:rgba(0,0,0,.7);padding:8px 16px;border-radius:4px;border:1px solid #f33;display:none;z-index:10;pointer-events:none}
     </style>
 </head>
 <body>
     <div id="vignette"></div>
     <div id="scanlines"></div>
     <div id="scareMessage"></div>
-
-    <div id="vhsOverlay">
-        <div id="recBadge"><span id="recDot">●</span> REC</div>
-        <div id="vhsTime">PLAY ▶ 00:00:00</div>
-    </div>
-    
+    <div id="vhsOverlay"><div id="recBadge"><span id="recDot">●</span> REC</div><div id="vhsTime">PLAY ▶ 00:00:00</div></div>
     <div id="aiStatusIndicator">Connexion Neural...</div>
-
-    <div id="chatInterface">
-        <div id="chatHistory"></div>
-        <div id="chatInputContainer">
-            <span id="chatPrefix">&gt;</span>
-            <div id="chatInputDisplay"></div>
-        </div>
-    </div>
-
-    <div id="staminaContainer">
-        <div id="staminaBar"></div>
-    </div>
-
+    <div id="chatInterface"><div id="chatHistory"></div><div id="chatInputContainer"><span id="chatPrefix">&gt;</span><div id="chatInputDisplay"></div></div></div>
+    <div id="staminaContainer"><div id="staminaBar"></div></div>
     <div id="interactPrompt">Appuyez sur [E] pour ramasser le document</div>
-
-    <div id="journalPopup">
-        <div id="journalTitle">Fragment de Journal Trouvé</div>
-        <div id="journalContent">Texte...</div>
-        <button class="menu-btn" id="journalClose">Fermer</button>
-    </div>
-
-    <div id="deathScreen" class="hidden">
-        <h1>CONSCIENCE PERDUE</h1>
-        <p id="deathReason">Le brouillard noir a étouffé votre réalité.</p>
-        <button id="retryBtn">Sombrer à nouveau</button>
-    </div>
+    <div id="journalPopup"><div id="journalTitle">Fragment de Journal Trouvé</div><div id="journalContent">Texte...</div><button class="menu-btn" id="journalClose">Fermer</button></div>
+    <div id="deathScreen" class="hidden"><h1>CONSCIENCE PERDUE</h1><p id="deathReason">Le brouillard noir a étouffé votre réalité.</p><button id="retryBtn">Sombrer à nouveau</button></div>
 
     <div id="blocker">
         <div id="mainMenu">
             <h1 id="gameTitle">ASYNC RESEARCH PROJECT</h1>
             <div id="subtitleText">Enregistrement de test - Secteur Infini</div>
             <hr style="border: 1px solid #a68d3a; width: 60%; margin: 20px auto;">
-            
             <button class="menu-btn" id="startBtn">Lancer la Simulation</button>
             <button class="menu-btn" id="settingsBtn">Paramètres Système</button>
-            
             <div id="details">
                 Dossier classifié : Vous êtes tombé hors de la réalité.<br><br>
                 ZQSD / WASD pour bouger | SHIFT pour courir<br>
@@ -230,23 +83,14 @@
         <div id="settingsMenu" class="hidden-panel">
             <h2 id="gameTitle" style="font-size: 24px;">PARAMÈTRES SYSTÈME</h2>
             <hr style="border: 1px solid #a68d3a; width: 40%; margin: 15px auto;">
-            
             <div class="setting-row">
                 <label for="sensSlider">Sensibilité Souris :</label>
-                <div>
-                    <input type="range" id="sensSlider" min="0.5" max="2.5" step="0.1" value="1.0">
-                    <span id="sensValue" style="display:inline-block; width: 45px;">100%</span>
-                </div>
+                <div><input type="range" id="sensSlider" min="0.5" max="2.5" step="0.1" value="1.0"><span id="sensValue" style="display:inline-block; width: 45px;">100%</span></div>
             </div>
-            
             <div class="setting-row">
                 <label for="volSlider">Volume Général :</label>
-                <div>
-                    <input type="range" id="volSlider" min="0" max="1" step="0.1" value="0.5">
-                    <span id="volValue" style="display:inline-block; width: 45px;">50%</span>
-                </div>
+                <div><input type="range" id="volSlider" min="0" max="1" step="0.1" value="0.5"><span id="volValue" style="display:inline-block; width: 45px;">50%</span></div>
             </div>
-
             <div class="setting-row" style="margin-top: 30px;">
                 <label for="apiKeyInput" style="color: #ff9999;">Clé API Gemini (Optionnelle) :</label>
                 <div style="display: flex; align-items: center;">
@@ -255,439 +99,163 @@
                 </div>
             </div>
             <div id="apiStatus" class="status-none">Configuration initiale : entrez une clé API valide ou validez à vide pour jouer hors-ligne.</div>
-            
             <div style="font-size: 11px; color: #888; text-align: left; width: 100%; margin-top: 15px;">
                 *La clé est sauvegardée localement. Elle permet à l'IA d'interagir dynamiquement avec vous en tant que Maître du Jeu. Sans clé, le jeu fonctionne en mode Survie Standard (Hors-ligne).
             </div>
-
             <button class="menu-btn" id="backBtn" style="margin-top: 25px;">Appliquer & Retour</button>
         </div>
     </div>
-    
     <div id="crosshair"></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
     <script>
-        // ==========================================
-        // CONSTANTES ET MOTEUR 3D
-        // ==========================================
-        const TILE_SIZE = 20;
-        const WALL_HEIGHT = 15;
-        const RENDER_DISTANCE = 6; 
-        const WALK_SPEED = 120.0;
-        const RUN_SPEED = 230.0;
-        const PLAYER_HEIGHT = 8;
+        const $ = id => document.getElementById(id); // Raccourci pour optimiser les tokens
+        const TILE_SIZE = 20, WALL_HEIGHT = 15, RENDER_DISTANCE = 6, WALK_SPEED = 120.0, RUN_SPEED = 230.0, PLAYER_HEIGHT = 8;
         
-        let camera, scene, renderer;
-        let controlsEnabled = false;
-        let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false, isRunning = false;
+        let camera, scene, renderer, controlsEnabled = false, moveForward = false, moveBackward = false, moveLeft = false, moveRight = false, isRunning = false;
         let prevTime = performance.now();
-        const velocity = new THREE.Vector3();
-        const euler = new THREE.Euler(0, 0, 0, 'YXZ');
-        const playerPos = new THREE.Vector3(0, PLAYER_HEIGHT, 0);
+        const velocity = new THREE.Vector3(), euler = new THREE.Euler(0, 0, 0, 'YXZ'), playerPos = new THREE.Vector3(0, PLAYER_HEIGHT, 0);
 
-        let mouseSensitivity = 0.002;
-        const baseSensitivity = 0.002;
-        let masterVolume = 0.5;
-
-        let isDead = false;
-        let stamina = 100;
-        const maxStamina = 100;
-        let isExhausted = false;
-        let startTime = null;
-
+        let mouseSensitivity = 0.002, baseSensitivity = 0.002, masterVolume = 0.5, isDead = false, stamina = 100, maxStamina = 100, isExhausted = false, startTime = null, bobTimer = 0; // Ajout de bobTimer pour le headbobbing
         const activeChunks = new Map();
-        let activeLights = [];
-        let dynamicAnomalies = []; 
-        let dynamicJournals = []; 
-
-        let wallMaterial, floorMaterial, ceilingMaterial, journalMaterial;
-        let audioCtx, humOscillator, noiseNode, humGain, noiseGain;
-        let monster, flashLight;
-        let monsterParticles = [];
-        
-        let monsterState = 'OFF'; 
-        let monsterTargetDist = 40; 
-
+        let activeLights = [], dynamicAnomalies = [], dynamicJournals = []; 
+        let wallMaterial, floorMaterial, ceilingMaterial, journalMaterial, audioCtx, humOscillator, noiseNode, humGain, noiseGain, monster, flashLight, monsterParticles = [];
+        let monsterState = 'OFF', monsterTargetDist = 40; 
         let domStaminaBar, domVhsTime, domDeathScreen, domChatInterface, domStaminaContainer, domVhsOverlay, domScareMessage, domVignette, domInteractPrompt, domJournalPopup, domJournalContent;
+        let flickerEndTime = 0, targetFogColor = new THREE.Color(0x3b3319), targetFogDensity = 0.022;
 
-        let flickerEndTime = 0;
-        let targetFogColor = new THREE.Color(0x3b3319);
-        let targetFogDensity = 0.022;
-
-        // ==========================================
-        // SYSTEME DE MEMOIRE PERSISTANTE (LONG-TERM MEMORY VECTOR)
-        // ==========================================
         const AppMemory = {
             db: [],
-            
-            init() {
-                try {
-                    const loaded = localStorage.getItem('backrooms_lt_memory');
-                    if (loaded) {
-                        this.db = JSON.parse(loaded);
-                    }
-                } catch(e) {
-                    console.error("Erreur de chargement de la mémoire à long terme :", e);
-                }
-            },
-            
+            init() { try { const l = localStorage.getItem('backrooms_lt_memory'); if(l) this.db = JSON.parse(l); } catch(e){} },
             save(sender, message) {
-                const entry = {
-                    sender,
-                    message,
-                    time: Date.now(),
-                    keywords: this.extractKeywords(message)
-                };
-                this.db.push(entry);
-                
-                if (this.db.length > 100) {
-                    this.db.shift();
-                }
-                
-                try {
-                    localStorage.setItem('backrooms_lt_memory', JSON.stringify(this.db));
-                } catch(e) {
-                    console.error("Impossible de persister l'historique :", e);
-                }
+                this.db.push({ sender, message, time: Date.now(), keywords: this.extractKeywords(message) });
+                if(this.db.length > 100) this.db.shift();
+                try { localStorage.setItem('backrooms_lt_memory', JSON.stringify(this.db)); } catch(e){}
             },
-            
             extractKeywords(text) {
-                const clean = text.toLowerCase()
-                                  .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"']/g," ")
-                                  .split(/\s+/);
-                const stopwords = ["je", "tu", "il", "nous", "vous", "ils", "le", "la", "les", "un", "une", "des", "et", "ou", "mais", "pour", "dans", "par", "sur", "avec", "que", "qui", "est", "pas", "plus", "dans"];
-                return [...new Set(clean.filter(w => w.length > 3 && !stopwords.includes(w)))];
+                const clean = text.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"']/g," ").split(/\s+/);
+                const stop = ["je","tu","il","nous","vous","ils","le","la","les","un","une","des","et","ou","mais","pour","dans","par","sur","avec","que","qui","est","pas","plus"];
+                return [...new Set(clean.filter(w => w.length > 3 && !stop.includes(w)))];
             },
-            
             retrieveRelevant(currentInput, limit = 4) {
-                if (this.db.length === 0) return "";
-                const currentKeywords = this.extractKeywords(currentInput);
-                if (currentKeywords.length === 0) {
-                    return this.db.slice(-2).map(e => `[Il y a un moment] ${e.sender}: ${e.message}`).join("\n");
-                }
+                if(!this.db.length) return "";
+                const cKw = this.extractKeywords(currentInput);
+                if(!cKw.length) return this.db.slice(-2).map(e => `[Il y a un moment] ${e.sender}: ${e.message}`).join("\n");
                 
-                const scored = this.db.map(entry => {
+                return this.db.map(entry => {
                     let score = 0;
-                    entry.keywords.forEach(kw => {
-                        if (currentKeywords.includes(kw)) score += 1;
-                    });
-                    const ageInMinutes = (Date.now() - entry.time) / 60000;
-                    score += Math.max(0, 0.5 - (ageInMinutes / 60)); 
+                    entry.keywords.forEach(kw => { if(cKw.includes(kw)) score++; });
+                    score += Math.max(0, 0.5 - ((Date.now() - entry.time) / 3600000));
                     return { entry, score };
-                });
-                
-                const top = scored.filter(s => s.score > 0.1)
-                                  .sort((a,b) => b.score - a.score)
-                                  .slice(0, limit)
-                                  .map(s => {
-                                      const minAgo = Math.round((Date.now() - s.entry.time) / 60000);
-                                      const label = minAgo <= 0 ? "À l'instant" : `Il y a ${minAgo} min`;
-                                      return `[${label}] ${s.entry.sender}: ${s.entry.message}`;
-                                  });
-                                  
-                return top.join("\n");
+                }).filter(s => s.score > 0.1).sort((a,b) => b.score - a.score).slice(0, limit).map(s => {
+                    const minAgo = Math.round((Date.now() - s.entry.time) / 60000);
+                    return `[${minAgo <= 0 ? "À l'instant" : `Il y a ${minAgo} min`}] ${s.entry.sender}: ${s.entry.message}`;
+                }).join("\n");
             }
         };
 
         const DEFAULT_JOURNALS = [
-            "FRAGMENT #1 : 'Le bruit des néons est devenu insupportable. Je crois que les murs changent de place quand je cligne des yeux. Si quelqu'un trouve cette note, ne restez pas au même endroit trop longtemps.'",
-            "FRAGMENT #2 : 'L'institut ASYNC a menti. Il n'y a pas de portail de retour simple. J'ai vu une forme noire glisser à la limite de mon champ de vision... Ce n'est pas une simple simulation.'",
-            "FRAGMENT #3 : 'J'ai découvert des cubes sombres, lévitant au milieu des couloirs. Ils dégagent une sorte d'énergie froide. Ils absorbent la lumière... Ne les touchez pas, j'ai vu ce qu'il est advenu de Miller.'",
-            "FRAGMENT #4 : 'Le Maître de cet endroit joue avec mon esprit. Il répond à mes pensées, à mes paroles. Si vous lui parlez, faites attention... il se souvient de tout.'"
+            "FRAGMENT #1 : 'Le bruit des néons est devenu insupportable. Je crois que les murs changent de place quand je cligne des yeux...'",
+            "FRAGMENT #2 : 'L'institut ASYNC a menti. Il n'y a pas de portail de retour simple. J'ai vu une forme noire...'",
+            "FRAGMENT #3 : 'J'ai découvert des cubes sombres, lévitant. Ils absorbent la lumière... Ne les touchez pas.'",
+            "FRAGMENT #4 : 'Le Maître de cet endroit joue avec mon esprit. Il répond à mes paroles. il se souvient de tout.'"
         ];
 
-        // ==========================================
-        // SYSTÈME IA DIRECTEUR DE JEU (GEMINI)
-        // ==========================================
-        let geminiApiKey = "";
-        let isChatMode = false;
-        let currentChatInput = "";
-        let aiHistory = [];
-        let isAIPending = false;
-        let lastAITriggerTime = performance.now();
-        let firstAnomalySeen = false;
-
-        const SYSTEM_PROMPT = `Tu es "L'Entité", le Maître du Jeu d'un jeu de survie "Backrooms". Tu n'es pas une IA d'assistance. Tu es une force omniprésente, cruelle et psychologique.
-Ton but : interagir avec le joueur, le manipuler, et générer de la tension.
-Tu reçois l'état actuel du monde (radar ASCII, stats, orientation), ainsi qu'un rappel de souvenirs extraits de la mémoire à long terme du joueur pour que tu puisses faire référence à des choses dites il y a longtemps.
-
+        let geminiApiKey = "", isChatMode = false, currentChatInput = "", aiHistory = [], isAIPending = false, lastAITriggerTime = performance.now(), firstAnomalySeen = false;
+        const SYSTEM_PROMPT = `Tu es "L'Entité", Maître du Jeu d'un jeu de survie "Backrooms". Tu n'es pas une IA d'assistance.
+Ton but : interagir, manipuler et générer de la tension.
 RÈGLES ABSOLUES :
-1. Réponds UNIQUEMENT avec un objet JSON valide. PAS de balises Markdown \`\`\`json, juste l'objet brut.
-2. Reste toujours dans ton rôle d'Entité cryptique. Ne mentionne jamais l'IA.
+1. Réponds UNIQUEMENT avec un objet JSON valide. PAS de balises Markdown.
+2. Reste dans ton rôle d'Entité cryptique. Ne mentionne pas l'IA.
+Actions possibles : { "command": "SET_MONSTER", "state": "STALKER"/"ATTACK"/"OFF", "distance": 40 }, { "command": "FLICKER_LIGHTS", "duration": 5 }, { "command": "PLAY_SOUND", "type": "SCREAM"/"WHISPER" }, { "command": "SPAWN_ANOMALY", "rel_x": 0, "rel_z": -2 }, { "command": "SHOW_MESSAGE", "text": "...", "duration": 3 }, { "command": "CHANGE_FOG", "color": "#ff0000", "density": 0.04 }, { "command": "SPAWN_JOURNAL", "rel_x": 0, "rel_z": -3, "title": "...", "content": "..." }
+Format attendu: { "message": "Texte...", "actions": [ { "command": "..." } ] }`;
 
-Commandes d'actions possibles (tu peux en combiner plusieurs dans le tableau "actions") :
-- { "command": "SET_MONSTER", "state": "STALKER", "distance": 40 } : Le monstre apparaît mais garde ses distances.
-- { "command": "SET_MONSTER", "state": "ATTACK" } : Le monstre fonce sur le joueur.
-- { "command": "SET_MONSTER", "state": "OFF" } : Fait disparaître le monstre.
-- { "command": "FLICKER_LIGHTS", "duration": 5 } : Fait clignoter les néons (durée en sec).
-- { "command": "PLAY_SOUND", "type": "SCREAM" } ou { "command": "PLAY_SOUND", "type": "WHISPER" } : Joue un son horrifique.
-- { "command": "SPAWN_ANOMALY", "rel_x": 0, "rel_z": -2 } : Fait apparaître un cube noir mortel (relatif au joueur).
-- { "command": "SHOW_MESSAGE", "text": "NE TE RETOURNE PAS", "duration": 3 } : Flash un texte subliminal sur l'écran.
-- { "command": "CHANGE_FOG", "color": "#ff0000", "density": 0.04, "duration": 10 } : Modifie l'ambiance visuelle.
-- { "command": "SPAWN_JOURNAL", "rel_x": 0, "rel_z": -3, "title": "Avertissement", "content": "Texte écrit sur la feuille" } : Fait apparaître une feuille de papier de journal interactive par terre avec un texte spécifique pour faire progresser l'histoire.
-
-Format JSON EXACT attendu :
-{
-  "message": "Texte de dialogue à afficher dans le chat du joueur (ou chaîne vide si aucun dialogue direct).",
-  "actions": [
-    { "command": "FLICKER_LIGHTS", "duration": 4 }
-  ]
-}`;
-
-        // ==========================================
-        // INITIALISATION
-        // ==========================================
-        window.onload = () => {
-            initDOMCache();
-            AppMemory.init(); 
-            initMenus();
-            init();
-            animate();
-        };
+        window.onload = () => { initDOMCache(); AppMemory.init(); initMenus(); init(); animate(); };
 
         function initDOMCache() {
-            domStaminaBar = document.getElementById('staminaBar');
-            domVhsTime = document.getElementById('vhsTime');
-            domDeathScreen = document.getElementById('deathScreen');
-            domChatInterface = document.getElementById('chatInterface');
-            domStaminaContainer = document.getElementById('staminaContainer');
-            domVhsOverlay = document.getElementById('vhsOverlay');
-            domScareMessage = document.getElementById('scareMessage');
-            domVignette = document.getElementById('vignette');
-            domInteractPrompt = document.getElementById('interactPrompt');
-            domJournalPopup = document.getElementById('journalPopup');
-            domJournalContent = document.getElementById('journalContent');
+            domStaminaBar = $('staminaBar'); domVhsTime = $('vhsTime'); domDeathScreen = $('deathScreen'); domChatInterface = $('chatInterface'); domStaminaContainer = $('staminaContainer'); domVhsOverlay = $('vhsOverlay'); domScareMessage = $('scareMessage'); domVignette = $('vignette'); domInteractPrompt = $('interactPrompt'); domJournalPopup = $('journalPopup'); domJournalContent = $('journalContent');
         }
 
         async function fetchWithTimeout(url, options, timeout = 10000) {
-            const controller = new AbortController();
-            const id = setTimeout(() => controller.abort(), timeout);
-            try {
-                const response = await fetch(url, { ...options, signal: controller.signal });
-                clearTimeout(id);
-                return response;
-            } catch (error) {
-                clearTimeout(id);
-                throw error;
-            }
+            const controller = new AbortController(); const id = setTimeout(() => controller.abort(), timeout);
+            try { const res = await fetch(url, { ...options, signal: controller.signal }); clearTimeout(id); return res; } 
+            catch (e) { clearTimeout(id); throw e; }
         }
 
-        // OPTIMISATION : Appel unique à gemini-2.0-flash directement pour économiser 50% de tes tokens de test !
         async function checkApiKeyValid(key) {
             try {
-                const payload = { contents: [{ parts: [{ text: "ping" }] }] };
-                
-                let res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+                const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: "ping" }] }] })
                 }, 5000).catch(() => null);
-
-                if (!res) return { valid: false, reason: "Impossible de joindre Google (Surcharge ou pas d'accès Internet)." };
+                if (!res) return { valid: false, reason: "Impossible de joindre Google." };
                 if (res.ok) return { valid: true };
-
-                if (res.status === 429) return { valid: false, reason: "Limite dépassée (Erreur 429) : réessayez dans 1 minute." };
-                if (res.status === 401) return { valid: false, reason: "Clé non autorisée (Erreur 401) : vérifiez votre copier-coller." };
-                if (res.status === 400) return { valid: false, reason: "Requête incorrecte (Erreur 400)." };
-                if (res.status === 403) return { valid: false, reason: "Accès interdit (Erreur 403)." };
                 return { valid: false, reason: `Erreur API Google (${res.status}).` };
-            } catch (err) {
-                return { valid: false, reason: "Erreur réseau inattendue." };
-            }
+            } catch (err) { return { valid: false, reason: "Erreur réseau." }; }
         }
 
         function initMenus() {
-            const apiInput = document.getElementById('apiKeyInput');
-            const apiStatus = document.getElementById('apiStatus');
-            const testBtn = document.getElementById('validateApiBtn');
-            const backBtn = document.getElementById('backBtn');
-            const mainMenu = document.getElementById('mainMenu');
-            const settingsMenu = document.getElementById('settingsMenu');
-            
+            const apiInput = $('apiKeyInput'), apiStatus = $('apiStatus'), testBtn = $('validateApiBtn'), backBtn = $('backBtn'), mainMenu = $('mainMenu'), settingsMenu = $('settingsMenu');
             const storedKey = localStorage.getItem('gemini_api_key');
-            
-            if (!storedKey) {
-                mainMenu.classList.add('hidden-panel');
-                settingsMenu.classList.remove('hidden-panel');
-            } else {
-                geminiApiKey = storedKey;
-                apiInput.value = geminiApiKey;
-                apiStatus.textContent = "Clé enregistrée. AI Director actif.";
-                apiStatus.className = "status-ok";
-            }
+            if (!storedKey) { mainMenu.classList.add('hidden-panel'); settingsMenu.classList.remove('hidden-panel'); } 
+            else { geminiApiKey = storedKey; apiInput.value = geminiApiKey; apiStatus.textContent = "Clé enregistrée. AI Director actif."; apiStatus.className = "status-ok"; }
 
             let isChecking = false;
-
             async function handleApiValidation() {
                 if (isChecking) return false;
                 const key = apiInput.value.trim();
-                
-                if (!key) {
-                    geminiApiKey = "";
-                    localStorage.removeItem('gemini_api_key');
-                    apiStatus.textContent = "Aucune clé. Mode hors-ligne actif (Survie Standard).";
-                    apiStatus.className = "status-none";
-                    return true;
-                }
-
-                isChecking = true;
-                testBtn.textContent = "Test..."; testBtn.disabled = true;
-                apiStatus.textContent = "Vérification..."; apiStatus.className = "status-none";
-
+                if (!key) { geminiApiKey = ""; localStorage.removeItem('gemini_api_key'); apiStatus.textContent = "Mode hors-ligne actif."; apiStatus.className = "status-none"; return true; }
+                isChecking = true; testBtn.textContent = "Test..."; testBtn.disabled = true; apiStatus.textContent = "Vérification..."; apiStatus.className = "status-none";
                 const result = await checkApiKeyValid(key);
-                
-                isChecking = false;
-                testBtn.textContent = "Vérifier"; testBtn.disabled = false;
-
-                if (result.valid) {
-                    geminiApiKey = key;
-                    localStorage.setItem('gemini_api_key', key);
-                    apiStatus.textContent = "Clé valide. L'Entité est connectée.";
-                    apiStatus.className = "status-ok";
-                    return true;
-                } else {
-                    apiStatus.textContent = result.reason;
-                    apiStatus.className = "status-err";
-                    return false;
-                }
+                isChecking = false; testBtn.textContent = "Vérifier"; testBtn.disabled = false;
+                if (result.valid) { geminiApiKey = key; localStorage.setItem('gemini_api_key', key); apiStatus.textContent = "Clé valide. L'Entité est connectée."; apiStatus.className = "status-ok"; return true; } 
+                else { apiStatus.textContent = result.reason; apiStatus.className = "status-err"; return false; }
             }
-
             testBtn.addEventListener('click', (e) => { e.stopPropagation(); handleApiValidation(); });
-
-            backBtn.addEventListener('click', async (e) => {
-                e.stopPropagation();
-                const currentInputValue = apiInput.value.trim();
-                if (currentInputValue !== geminiApiKey) {
-                    const isValid = await handleApiValidation();
-                    if (!isValid && currentInputValue !== "") return; 
-                }
-                settingsMenu.classList.add('hidden-panel');
-                mainMenu.classList.remove('hidden-panel');
-            });
+            backBtn.addEventListener('click', async (e) => { e.stopPropagation(); if (apiInput.value.trim() !== geminiApiKey) { if (!(await handleApiValidation()) && apiInput.value.trim() !== "") return; } settingsMenu.classList.add('hidden-panel'); mainMenu.classList.remove('hidden-panel'); });
         }
 
         function init() {
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x3b3319);
-            scene.fog = new THREE.FogExp2(0x3b3319, 0.022);
+            scene = new THREE.Scene(); scene.background = new THREE.Color(0x3b3319); scene.fog = new THREE.FogExp2(0x3b3319, 0.022);
+            camera = new THREE.PerspectiveCamera(85, window.innerWidth / window.innerHeight, 0.1, 300); camera.position.copy(playerPos);
+            flashLight = new THREE.PointLight(0xffeedd, 0.7, 35); camera.add(flashLight); scene.add(camera);
+            createMonster(); createMaterials();
 
-            camera = new THREE.PerspectiveCamera(85, window.innerWidth / window.innerHeight, 0.1, 300);
-            camera.position.copy(playerPos);
-
-            flashLight = new THREE.PointLight(0xffeedd, 0.7, 35);
-            camera.add(flashLight);
-            scene.add(camera);
-
-            createMonster();
-            createMaterials();
-
-            const floorGeo = new THREE.PlaneGeometry(2000, 2000);
-            const floor = new THREE.Mesh(floorGeo, floorMaterial);
-            floor.rotation.x = -Math.PI / 2;
-            scene.add(floor);
-
-            const ceilingGeo = new THREE.PlaneGeometry(2000, 2000);
-            const ceiling = new THREE.Mesh(ceilingGeo, ceilingMaterial);
-            ceiling.rotation.x = Math.PI / 2;
-            ceiling.position.y = WALL_HEIGHT;
-            scene.add(ceiling);
-
+            const floor = new THREE.Mesh(new THREE.PlaneGeometry(2000, 2000), floorMaterial); floor.rotation.x = -Math.PI / 2; scene.add(floor);
+            const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(2000, 2000), ceilingMaterial); ceiling.rotation.x = Math.PI / 2; ceiling.position.y = WALL_HEIGHT; scene.add(ceiling);
             scene.add(new THREE.AmbientLight(0x404040, 0.6));
 
-            renderer = new THREE.WebGLRenderer({ antialias: false });
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            document.body.appendChild(renderer.domElement);
-
-            setupUI();
-            setupInputs();
-
-            window.addEventListener('resize', onWindowResize);
+            renderer = new THREE.WebGLRenderer({ antialias: false }); renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); renderer.setSize(window.innerWidth, window.innerHeight); document.body.appendChild(renderer.domElement);
+            setupUI(); setupInputs(); window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
         }
 
         function createMonster() {
-            monster = new THREE.Group();
-            monsterParticles = [];
-            const mMat = new THREE.MeshBasicMaterial({ color: 0x020202, transparent: true, opacity: 0.85, depthWrite: false });
-            
-            const sphereGeo = new THREE.SphereGeometry(3, 8, 8);
+            monster = new THREE.Group(); monsterParticles = [];
+            const mMat = new THREE.MeshBasicMaterial({ color: 0x020202, transparent: true, opacity: 0.85, depthWrite: false }), sphereGeo = new THREE.SphereGeometry(3, 8, 8);
             for (let i = 0; i < 30; i++) {
-                const blob = new THREE.Mesh(sphereGeo, mMat);
-                const theta = Math.random() * Math.PI * 2;
-                const phi = Math.acos((Math.random() * 2) - 1);
-                const dist = Math.random() * 6;
-                blob.position.set(
-                    Math.sin(phi) * Math.cos(theta) * dist, 
-                    Math.sin(phi) * Math.sin(theta) * dist + 4, 
-                    Math.cos(phi) * dist
-                );
-                monster.add(blob);
-                monsterParticles.push({ 
-                    mesh: blob, phase: Math.random() * Math.PI * 2, speed: 0.4 + Math.random() * 1.2, 
-                    offsetX: blob.position.x, offsetY: blob.position.y, offsetZ: blob.position.z 
-                });
+                const blob = new THREE.Mesh(sphereGeo, mMat), theta = Math.random() * Math.PI * 2, phi = Math.acos((Math.random() * 2) - 1), dist = Math.random() * 6;
+                blob.position.set(Math.sin(phi) * Math.cos(theta) * dist, Math.sin(phi) * Math.sin(theta) * dist + 4, Math.cos(phi) * dist);
+                monster.add(blob); monsterParticles.push({ mesh: blob, phase: Math.random() * Math.PI * 2, speed: 0.4 + Math.random() * 1.2, offsetX: blob.position.x, offsetY: blob.position.y, offsetZ: blob.position.z });
             }
-            monster.position.set(0, 0, -1000);
-            monster.visible = false;
-            scene.add(monster);
+            monster.position.set(0, 0, -1000); monster.visible = false; scene.add(monster);
         }
 
         function setupUI() {
-            document.getElementById('sensSlider').addEventListener('input', function() {
-                mouseSensitivity = baseSensitivity * parseFloat(this.value);
-                document.getElementById('sensValue').innerText = Math.round(parseFloat(this.value) * 100) + '%';
-            });
-            
-            document.getElementById('volSlider').addEventListener('input', function() {
-                masterVolume = parseFloat(this.value);
-                document.getElementById('volValue').innerText = Math.round(masterVolume * 100) + '%';
-                if (audioCtx) {
-                    if (humGain) humGain.gain.value = 0.1 * masterVolume;
-                    if (noiseGain) noiseGain.gain.value = 0.005 * masterVolume;
-                }
-            });
-
-            document.getElementById('startBtn').addEventListener('click', (e) => { 
-                e.stopPropagation(); 
-                if (!isDead) document.body.requestPointerLock(); 
-            });
-            
-            document.getElementById('settingsBtn').addEventListener('click', (e) => { 
-                e.stopPropagation(); 
-                document.getElementById('mainMenu').classList.add('hidden-panel'); 
-                document.getElementById('settingsMenu').classList.remove('hidden-panel'); 
-            });
-            
-            document.getElementById('blocker').addEventListener('click', () => { 
-                if (!isDead && document.getElementById('settingsMenu').classList.contains('hidden-panel') && domJournalPopup.style.display !== 'flex') {
-                    document.body.requestPointerLock();
-                }
-            });
-
-            document.getElementById('retryBtn').addEventListener('click', () => { location.reload(); });
-            
-            document.getElementById('journalClose').addEventListener('click', () => {
-                domJournalPopup.style.display = 'none';
-                document.body.requestPointerLock();
-            });
+            $('sensSlider').addEventListener('input', function() { mouseSensitivity = baseSensitivity * parseFloat(this.value); $('sensValue').innerText = Math.round(parseFloat(this.value) * 100) + '%'; });
+            $('volSlider').addEventListener('input', function() { masterVolume = parseFloat(this.value); $('volValue').innerText = Math.round(masterVolume * 100) + '%'; if (audioCtx) { if (humGain) humGain.gain.value = 0.1 * masterVolume; if (noiseGain) noiseGain.gain.value = 0.005 * masterVolume; } });
+            $('startBtn').addEventListener('click', (e) => { e.stopPropagation(); if (!isDead) document.body.requestPointerLock(); });
+            $('settingsBtn').addEventListener('click', (e) => { e.stopPropagation(); $('mainMenu').classList.add('hidden-panel'); $('settingsMenu').classList.remove('hidden-panel'); });
+            $('blocker').addEventListener('click', () => { if (!isDead && $('settingsMenu').classList.contains('hidden-panel') && domJournalPopup.style.display !== 'flex') document.body.requestPointerLock(); });
+            $('retryBtn').addEventListener('click', () => { location.reload(); });
+            $('journalClose').addEventListener('click', () => { domJournalPopup.style.display = 'none'; document.body.requestPointerLock(); });
 
             document.addEventListener('pointerlockchange', () => {
                 if (document.pointerLockElement === document.body) {
-                    controlsEnabled = true;
-                    document.getElementById('blocker').classList.add('hidden');
-                    domStaminaContainer.style.display = 'block';
-                    domVhsOverlay.style.display = 'block';
-                    domChatInterface.style.display = 'flex';
-                    initAudio();
-                    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
-                    if (geminiApiKey && aiHistory.length === 0) {
-                        triggerAI("Le joueur vient d'entrer dans les Backrooms.");
-                    }
+                    controlsEnabled = true; $('blocker').classList.add('hidden'); domStaminaContainer.style.display = 'block'; domVhsOverlay.style.display = 'block'; domChatInterface.style.display = 'flex';
+                    initAudio(); if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+                    if (geminiApiKey && !aiHistory.length) triggerAI("Le joueur vient d'entrer dans les Backrooms.");
                 } else {
-                    controlsEnabled = false;
-                    if (!isDead && domJournalPopup.style.display !== 'flex') {
-                        document.getElementById('blocker').classList.remove('hidden');
-                    }
+                    controlsEnabled = false; if (!isDead && domJournalPopup.style.display !== 'flex') $('blocker').classList.remove('hidden');
                     if (audioCtx && audioCtx.state === 'running') audioCtx.suspend();
                 }
             });
@@ -696,754 +264,301 @@ Format JSON EXACT attendu :
         function setupInputs() {
             document.addEventListener('mousemove', (e) => {
                 if (controlsEnabled && !isDead && !isChatMode) {
-                    euler.setFromQuaternion(camera.quaternion);
-                    euler.y -= e.movementX * mouseSensitivity;
-                    euler.x -= e.movementY * mouseSensitivity;
-                    euler.x = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, euler.x));
-                    camera.quaternion.setFromEuler(euler);
+                    euler.setFromQuaternion(camera.quaternion); euler.y -= e.movementX * mouseSensitivity; euler.x -= e.movementY * mouseSensitivity;
+                    euler.x = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, euler.x)); camera.quaternion.setFromEuler(euler);
                 }
             });
-
             document.addEventListener('keydown', (e) => {
                 if (isDead) return;
-
                 if (isChatMode) {
-                    if (e.key === 'Enter') {
-                        e.preventDefault();
-                        if (currentChatInput.trim().length > 0) sendPlayerMessage(currentChatInput.trim());
-                        closeChat();
-                    } else if (e.key === 'Escape') {
-                        e.preventDefault(); closeChat();
-                    } else if (e.key === 'Backspace') {
-                        e.preventDefault(); currentChatInput = currentChatInput.slice(0, -1); renderChatInput();
-                    } else if (e.key.length === 1) {
-                        e.preventDefault(); currentChatInput += e.key; renderChatInput();
-                    }
+                    if (e.key === 'Enter') { e.preventDefault(); if (currentChatInput.trim().length > 0) sendPlayerMessage(currentChatInput.trim()); closeChat(); } 
+                    else if (e.key === 'Escape') { e.preventDefault(); closeChat(); } 
+                    else if (e.key === 'Backspace') { e.preventDefault(); currentChatInput = currentChatInput.slice(0, -1); renderChatInput(); } 
+                    else if (e.key.length === 1) { e.preventDefault(); currentChatInput += e.key; renderChatInput(); }
                     return;
                 }
-
                 if (!controlsEnabled) return;
-
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    isChatMode = true;
-                    moveForward = moveBackward = moveLeft = moveRight = isRunning = false;
-                    document.getElementById('chatInputContainer').style.display = 'flex';
-                    renderChatInput();
-                    return;
-                }
-
-                if (e.key.toLowerCase() === 'e') {
-                    checkAndInteractJournal();
-                }
-
-                switch (e.key.toLowerCase()) {
-                    case 'shift': isRunning = true; break;
-                    case 'w': case 'z': case 'arrowup': moveForward = true; break;
-                    case 'a': case 'q': case 'arrowleft': moveLeft = true; break;
-                    case 's': case 'arrowdown': moveBackward = true; break;
-                    case 'd': case 'arrowright': moveRight = true; break;
-                }
+                if (e.key === 'Enter') { e.preventDefault(); isChatMode = true; moveForward = moveBackward = moveLeft = moveRight = isRunning = false; $('chatInputContainer').style.display = 'flex'; renderChatInput(); return; }
+                if (e.key.toLowerCase() === 'e') checkAndInteractJournal();
+                switch (e.key.toLowerCase()) { case 'shift': isRunning = true; break; case 'w': case 'z': case 'arrowup': moveForward = true; break; case 'a': case 'q': case 'arrowleft': moveLeft = true; break; case 's': case 'arrowdown': moveBackward = true; break; case 'd': case 'arrowright': moveRight = true; break; }
             });
-
             document.addEventListener('keyup', (e) => {
                 if (isChatMode) return;
-                switch (e.key.toLowerCase()) {
-                    case 'shift': isRunning = false; break;
-                    case 'w': case 'z': case 'arrowup': moveForward = false; break;
-                    case 'a': case 'q': case 'arrowleft': moveLeft = false; break;
-                    case 's': case 'arrowdown': moveBackward = false; break;
-                    case 'd': case 'arrowright': moveRight = false; break;
-                }
+                switch (e.key.toLowerCase()) { case 'shift': isRunning = false; break; case 'w': case 'z': case 'arrowup': moveForward = false; break; case 'a': case 'q': case 'arrowleft': moveLeft = false; break; case 's': case 'arrowdown': moveBackward = false; break; case 'd': case 'arrowright': moveRight = false; break; }
             });
         }
 
-        // ==========================================
-        // MOTEUR DE GÉNÉRATION & RADAR
-        // ==========================================
-        function hash(x, z) {
-            let n = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453123;
-            return n - Math.floor(n);
-        }
-        
-        function isWall(cx, cz) { 
-            return (cx !== 0 || cz !== 0) && hash(cx, cz) < 0.28; 
-        }
-        
-        function hasAnomaly(cx, cz) { 
-            return hash(cx + 500, cz + 500) < 0.008 || dynamicAnomalies.some(a => a.cx === cx && a.cz === cz); 
-        }
-
-        function hasJournal(cx, cz) {
-            return (hash(cx + 1000, cz + 1000) < 0.015 && !isWall(cx, cz)) || dynamicJournals.some(j => j.cx === cx && j.cz === cz && !j.picked);
-        }
+        const hash = (x, z) => { let n = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453123; return n - Math.floor(n); };
+        const isWall = (cx, cz) => (cx !== 0 || cz !== 0) && hash(cx, cz) < 0.28;
+        const hasAnomaly = (cx, cz) => hash(cx + 500, cz + 500) < 0.008 || dynamicAnomalies.some(a => a.cx === cx && a.cz === cz);
+        const hasJournal = (cx, cz) => (hash(cx + 1000, cz + 1000) < 0.015 && !isWall(cx, cz)) || dynamicJournals.some(j => j.cx === cx && j.cz === cz && !j.picked);
 
         function generateChunk(cx, cz, key) {
-            const group = new THREE.Group();
-            group.position.set(cx * TILE_SIZE, 0, cz * TILE_SIZE);
-            let lightObj = null;
-            let anomalyObj = null;
-            let journalObj = null;
+            const group = new THREE.Group(); group.position.set(cx * TILE_SIZE, 0, cz * TILE_SIZE);
+            let lightObj = null, anomalyObj = null, journalObj = null;
 
             if (isWall(cx, cz)) {
-                const mesh = new THREE.Mesh(new THREE.BoxGeometry(TILE_SIZE, WALL_HEIGHT, TILE_SIZE), wallMaterial);
-                mesh.position.y = WALL_HEIGHT / 2;
-                group.add(mesh);
+                const mesh = new THREE.Mesh(new THREE.BoxGeometry(TILE_SIZE, WALL_HEIGHT, TILE_SIZE), wallMaterial); mesh.position.y = WALL_HEIGHT / 2; group.add(mesh);
             } else {
                 if (hasAnomaly(cx, cz)) {
-                    lightObj = new THREE.PointLight(0xaa0000, 1.5, 20);
-                    lightObj.position.set(cx * TILE_SIZE, WALL_HEIGHT / 2, cz * TILE_SIZE);
-                    scene.add(lightObj);
-                    activeLights.push({ light: lightObj, cx: cx, cz: cz, isAnomaly: true });
-
-                    anomalyObj = new THREE.Mesh(new THREE.OctahedronGeometry(2), new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.1, metalness: 0.8 }));
-                    anomalyObj.position.set(0, WALL_HEIGHT / 2, 0);
-                    group.add(anomalyObj);
+                    lightObj = new THREE.PointLight(0xaa0000, 1.5, 20); lightObj.position.set(cx * TILE_SIZE, WALL_HEIGHT / 2, cz * TILE_SIZE); scene.add(lightObj);
+                    activeLights.push({ light: lightObj, cx, cz, isAnomaly: true });
+                    anomalyObj = new THREE.Mesh(new THREE.OctahedronGeometry(2), new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.1, metalness: 0.8 })); anomalyObj.position.set(0, WALL_HEIGHT / 2, 0); group.add(anomalyObj);
                 } else {
                     if (hasJournal(cx, cz)) {
-                        let journalData = dynamicJournals.find(j => j.cx === cx && j.cz === cz);
-                        if (!journalData) {
-                            const index = Math.abs(Math.floor(hash(cx, cz) * DEFAULT_JOURNALS.length));
-                            journalData = {
-                                cx, cz,
-                                title: `Rapport #${Math.abs(cx+cz)}`,
-                                content: DEFAULT_JOURNALS[index],
-                                picked: false
-                            };
-                            dynamicJournals.push(journalData);
-                        }
-
-                        if (!journalData.picked) {
-                            const planeGeo = new THREE.PlaneGeometry(1.5, 2.2);
-                            journalObj = new THREE.Mesh(planeGeo, journalMaterial);
-                            journalObj.rotation.x = -Math.PI / 2;
-                            journalObj.rotation.z = hash(cx, cz) * Math.PI; 
-                            journalObj.position.set(0, 0.05, 0);
-                            group.add(journalObj);
-
-                            lightObj = new THREE.PointLight(0xff3333, 0.5, 5);
-                            lightObj.position.set(cx * TILE_SIZE, 0.8, cz * TILE_SIZE);
-                            scene.add(lightObj);
-                            activeLights.push({ light: lightObj, cx: cx, cz: cz, isAnomaly: false, isJournal: true });
+                        let jData = dynamicJournals.find(j => j.cx === cx && j.cz === cz);
+                        if (!jData) { jData = { cx, cz, title: `Rapport #${Math.abs(cx+cz)}`, content: DEFAULT_JOURNALS[Math.abs(Math.floor(hash(cx, cz) * DEFAULT_JOURNALS.length))], picked: false }; dynamicJournals.push(jData); }
+                        if (!jData.picked) {
+                            journalObj = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 2.2), journalMaterial); journalObj.rotation.set(-Math.PI / 2, 0, hash(cx, cz) * Math.PI); journalObj.position.set(0, 0.05, 0); group.add(journalObj);
+                            lightObj = new THREE.PointLight(0xff3333, 0.5, 5); lightObj.position.set(cx * TILE_SIZE, 0.8, cz * TILE_SIZE); scene.add(lightObj); activeLights.push({ light: lightObj, cx, cz, isAnomaly: false, isJournal: true });
                         }
                     }
-
                     if (hash(cx + 100, cz + 100) < 0.2) {
-                        lightObj = new THREE.PointLight(0xfff5b6, 0.8, 60);
-                        lightObj.position.set(cx * TILE_SIZE, WALL_HEIGHT - 0.2, cz * TILE_SIZE);
-                        scene.add(lightObj);
-                        activeLights.push({ light: lightObj, cx: cx, cz: cz, isAnomaly: false, extinguished: false });
-
-                        const neon = new THREE.Mesh(new THREE.BoxGeometry(4, 0.1, 4), new THREE.MeshBasicMaterial({ color: 0xffffee }));
-                        neon.position.set(0, WALL_HEIGHT - 0.05, 0);
-                        group.add(neon);
+                        lightObj = new THREE.PointLight(0xfff5b6, 0.8, 60); lightObj.position.set(cx * TILE_SIZE, WALL_HEIGHT - 0.2, cz * TILE_SIZE); scene.add(lightObj); activeLights.push({ light: lightObj, cx, cz, isAnomaly: false, extinguished: false });
+                        const neon = new THREE.Mesh(new THREE.BoxGeometry(4, 0.1, 4), new THREE.MeshBasicMaterial({ color: 0xffffee })); neon.position.set(0, WALL_HEIGHT - 0.05, 0); group.add(neon);
                     }
                 }
             }
-            scene.add(group);
-            activeChunks.set(key, { mesh: group, light: lightObj, anomaly: anomalyObj, journal: journalObj, cx, cz });
+            scene.add(group); activeChunks.set(key, { mesh: group, light: lightObj, anomaly: anomalyObj, journal: journalObj, cx, cz });
         }
 
         function updateChunks() {
-            const currentChunkX = Math.floor((camera.position.x + TILE_SIZE/2) / TILE_SIZE);
-            const currentChunkZ = Math.floor((camera.position.z + TILE_SIZE/2) / TILE_SIZE);
-            const chunksInRadius = new Set();
-
+            const ccX = Math.floor((camera.position.x + TILE_SIZE/2) / TILE_SIZE), ccZ = Math.floor((camera.position.z + TILE_SIZE/2) / TILE_SIZE), inRadius = new Set();
             for (let x = -RENDER_DISTANCE; x <= RENDER_DISTANCE; x++) {
                 for (let z = -RENDER_DISTANCE; z <= RENDER_DISTANCE; z++) {
-                    const cx = currentChunkX + x;
-                    const cz = currentChunkZ + z;
-                    const key = `${cx},${cz}`;
-                    chunksInRadius.add(key);
+                    const cx = ccX + x, cz = ccZ + z, key = `${cx},${cz}`; inRadius.add(key);
                     if (!activeChunks.has(key)) generateChunk(cx, cz, key);
                 }
             }
-
             for (const [key, obj] of activeChunks.entries()) {
-                if (!chunksInRadius.has(key)) {
-                    scene.remove(obj.mesh);
-                    obj.mesh.traverse(child => {
-                        if (child.isMesh) {
-                            child.geometry.dispose();
-                        }
-                    });
-                    if (obj.light) { 
-                        scene.remove(obj.light); 
-                        obj.light.dispose();
-                        activeLights = activeLights.filter(l => l.light !== obj.light); 
-                    }
+                if (!inRadius.has(key)) {
+                    scene.remove(obj.mesh); obj.mesh.traverse(c => { if(c.isMesh) c.geometry.dispose(); });
+                    if (obj.light) { scene.remove(obj.light); obj.light.dispose(); activeLights = activeLights.filter(l => l.light !== obj.light); }
                     activeChunks.delete(key);
                 }
             }
         }
 
-        function checkCollision(targetX, targetZ) {
-            const r = 2.0;
-            const corners = [
-                { x: targetX - r, z: targetZ - r }, 
-                { x: targetX + r, z: targetZ - r },
-                { x: targetX - r, z: targetZ + r }, 
-                { x: targetX + r, z: targetZ + r }
-            ];
-            for (let c of corners) {
-                if (isWall(Math.floor((c.x + TILE_SIZE/2) / TILE_SIZE), Math.floor((c.z + TILE_SIZE/2) / TILE_SIZE))) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        function getFacingDirection() {
-            const deg = (euler.y * 180 / Math.PI + 360) % 360;
-            if (deg >= 315 || deg < 45) return "N";
-            if (deg >= 45 && deg < 135) return "O";
-            if (deg >= 135 && deg < 225) return "S";
-            return "E";
+        function checkCollision(tX, tZ) {
+            return [{x:tX-2,z:tZ-2}, {x:tX+2,z:tZ-2}, {x:tX-2,z:tZ+2}, {x:tX+2,z:tZ+2}].some(c => isWall(Math.floor((c.x + TILE_SIZE/2) / TILE_SIZE), Math.floor((c.z + TILE_SIZE/2) / TILE_SIZE)));
         }
 
         function generateAsciiRadar() {
-            let radar = "";
-            let px = Math.floor((camera.position.x + TILE_SIZE/2) / TILE_SIZE);
-            let pz = Math.floor((camera.position.z + TILE_SIZE/2) / TILE_SIZE);
-            
-            let mx = (monsterState !== 'OFF') ? Math.floor((monster.position.x + TILE_SIZE/2) / TILE_SIZE) : -999;
-            let mz = (monsterState !== 'OFF') ? Math.floor((monster.position.z + TILE_SIZE/2) / TILE_SIZE) : -999;
-
-            const facing = getFacingDirection();
-            let charP = facing === 'N' ? '^' : (facing === 'S' ? 'v' : (facing === 'E' ? '>' : '<'));
-
-            for(let z = -3; z <= 3; z++) {
-                for(let x = -3; x <= 3; x++) {
-                    let cx = px + x;
-                    let cz = pz + z;
-                    if (cx === mx && cz === mz) radar += "M";
-                    else if (x === 0 && z === 0) radar += charP;
-                    else if (isWall(cx, cz)) radar += "#";
-                    else if (hasAnomaly(cx, cz)) radar += "A";
-                    else if (hasJournal(cx, cz)) radar += "J";
-                    else radar += ".";
-                }
-                radar += "\n";
-            }
-            return radar;
+            let r="", px=Math.floor((camera.position.x + TILE_SIZE/2)/TILE_SIZE), pz=Math.floor((camera.position.z + TILE_SIZE/2)/TILE_SIZE);
+            let mx=(monsterState!=='OFF')?Math.floor((monster.position.x + TILE_SIZE/2)/TILE_SIZE):-999, mz=(monsterState!=='OFF')?Math.floor((monster.position.z + TILE_SIZE/2)/TILE_SIZE):-999;
+            const deg = (euler.y * 180 / Math.PI + 360) % 360, f = (deg >= 315 || deg < 45) ? 'N' : (deg >= 45 && deg < 135) ? 'O' : (deg >= 135 && deg < 225) ? 'S' : 'E';
+            for(let z=-3;z<=3;z++){ for(let x=-3;x<=3;x++){
+                let cx=px+x, cz=pz+z;
+                if(cx===mx && cz===mz) r+="M"; else if(x===0 && z===0) r+=(f==='N'?'^':f==='S'?'v':f==='E'?'>':'<'); else if(isWall(cx,cz)) r+="#"; else if(hasAnomaly(cx,cz)) r+="A"; else if(hasJournal(cx,cz)) r+="J"; else r+=".";
+            } r+="\n"; } return r;
         }
 
         function checkAndInteractJournal() {
-            const px = Math.floor((camera.position.x + TILE_SIZE/2) / TILE_SIZE);
-            const pz = Math.floor((camera.position.z + TILE_SIZE/2) / TILE_SIZE);
-            
             for (let [key, obj] of activeChunks.entries()) {
-                if (obj.journal) {
-                    const dist = camera.position.distanceTo(new THREE.Vector3(obj.cx * TILE_SIZE, PLAYER_HEIGHT, obj.cz * TILE_SIZE));
-                    if (dist < 10) {
-                        let journalData = dynamicJournals.find(j => j.cx === obj.cx && j.cz === obj.cz);
-                        if (journalData && !journalData.picked) {
-                            journalData.picked = true;
-                            
-                            obj.mesh.remove(obj.journal);
-                            obj.journal.geometry.dispose();
-                            obj.journal = null;
-                            if (obj.light) {
-                                scene.remove(obj.light);
-                                obj.light.dispose();
-                                activeLights = activeLights.filter(l => l.light !== obj.light);
-                                obj.light = null;
-                            }
-                            
-                            AppMemory.save("Explorateur", `A trouvé et lu le document '${journalData.title}': "${journalData.content}"`);
-
-                            document.exitPointerLock();
-                            domJournalPopup.style.display = 'flex';
-                            document.getElementById('journalTitle').innerText = journalData.title;
-                            domJournalContent.innerText = journalData.content;
-                            
-                            triggerAI(`Le joueur a ramassé et lu le document nommé "${journalData.title}" avec le contenu: "${journalData.content}". Réagis psychologiquement à cela.`);
-                            break;
-                        }
+                if (obj.journal && camera.position.distanceTo(new THREE.Vector3(obj.cx * TILE_SIZE, PLAYER_HEIGHT, obj.cz * TILE_SIZE)) < 10) {
+                    let jData = dynamicJournals.find(j => j.cx === obj.cx && j.cz === obj.cz);
+                    if (jData && !jData.picked) {
+                        jData.picked = true; obj.mesh.remove(obj.journal); obj.journal.geometry.dispose(); obj.journal = null;
+                        if (obj.light) { scene.remove(obj.light); obj.light.dispose(); activeLights = activeLights.filter(l => l.light !== obj.light); obj.light = null; }
+                        AppMemory.save("Explorateur", `A trouvé et lu '${jData.title}'`); document.exitPointerLock();
+                        domJournalPopup.style.display = 'flex'; $('journalTitle').innerText = jData.title; domJournalContent.innerText = jData.content;
+                        triggerAI(`Le joueur a lu "${jData.title}": "${jData.content}". Réagis.`); break;
                     }
                 }
             }
         }
 
         function updateInteractPrompt() {
-            let showPrompt = false;
-            for (let [key, obj] of activeChunks.entries()) {
-                if (obj.journal) {
-                    const dist = camera.position.distanceTo(new THREE.Vector3(obj.cx * TILE_SIZE, PLAYER_HEIGHT, obj.cz * TILE_SIZE));
-                    if (dist < 10) {
-                        showPrompt = true;
-                        break;
-                    }
-                }
-            }
-            if (domInteractPrompt) {
-                domInteractPrompt.style.display = showPrompt ? 'block' : 'none';
-            }
+            if(domInteractPrompt) domInteractPrompt.style.display = [...activeChunks.values()].some(o => o.journal && camera.position.distanceTo(new THREE.Vector3(o.cx * TILE_SIZE, PLAYER_HEIGHT, o.cz * TILE_SIZE)) < 10) ? 'block' : 'none';
         }
 
-        // ==========================================
-        // GESTION DU CHAT & API GEMINI
-        // ==========================================
-        function renderChatInput() {
-            document.getElementById('chatInputDisplay').innerHTML = currentChatInput + '<span class="blinking-cursor"></span>';
+        function renderChatInput() { $('chatInputDisplay').innerHTML = currentChatInput + '<span class="blinking-cursor"></span>'; }
+        function closeChat() { isChatMode = false; currentChatInput = ""; $('chatInputContainer').style.display = 'none'; }
+        function addChatLine(sender, text, isSys = false) {
+            const h = $('chatHistory'), d = document.createElement('div'); d.className = 'chat-msg ' + (isSys ? 'system' : (sender === 'Vous' ? 'player' : 'entity'));
+            isSys ? d.innerText = `*** ${text} ***` : d.innerHTML = `<strong>${sender}:</strong> ${text}`;
+            h.appendChild(d); h.scrollTop = h.scrollHeight; while(h.children.length > 5) h.removeChild(h.firstChild);
         }
-        function closeChat() {
-            isChatMode = false;
-            currentChatInput = "";
-            document.getElementById('chatInputContainer').style.display = 'none';
-        }
+        function sendPlayerMessage(msg) { addChatLine('Vous', msg); AppMemory.save("Joueur", msg); triggerAI("Le joueur a parlé.", msg); }
 
-        function addChatLine(sender, text, isSystem = false) {
-            const hist = document.getElementById('chatHistory');
-            const div = document.createElement('div');
-            div.className = 'chat-msg ' + (isSystem ? 'system' : (sender === 'Vous' ? 'player' : 'entity'));
-            if (isSystem) {
-                div.innerText = `*** ${text} ***`;
-            } else {
-                div.innerHTML = `<strong>${sender}:</strong> ${text}`;
-            }
-            hist.appendChild(div);
-            hist.scrollTop = hist.scrollHeight;
-            while(hist.children.length > 5) hist.removeChild(hist.firstChild);
-        }
-
-        function sendPlayerMessage(msg) {
-            addChatLine('Vous', msg);
-            AppMemory.save("Joueur", msg); 
-            triggerAI("Le joueur a parlé.", msg);
-        }
-
-        // OPTIMISATION : Appel unique à gemini-2.0-flash directement sans double-requêtes
         async function triggerAI(reason, userMessage = "") {
-            if (!geminiApiKey) {
-                if (userMessage) addChatLine("Système", "IA indisponible. L'Entité ne peut pas vous entendre.", true);
-                return;
-            }
+            if (!geminiApiKey) { if (userMessage) addChatLine("Système", "IA indisponible.", true); return; }
             if (isAIPending) return;
+            
+            // Sécurité anti-spam et limite de tokens
+            reason = String(reason || "").substring(0, 100);
+            userMessage = String(userMessage || "").substring(0, 150);
+            
+            isAIPending = true; lastAITriggerTime = performance.now(); $('aiStatusIndicator').style.display = 'block';
 
-            isAIPending = true;
-            lastAITriggerTime = performance.now();
-            document.getElementById('aiStatusIndicator').style.display = 'block';
-
-            const promptContextInput = userMessage || reason;
-            const memoriesRecall = AppMemory.retrieveRelevant(promptContextInput, 3);
-
-            let contextData = {
-                evt: reason,
-                map: generateAsciiRadar(),
-                stamina: stamina.toFixed(0),
-                monster: monsterState,
-                long_term_memories: memoriesRecall ? memoriesRecall : "Aucun souvenir marquant pour l'instant."
-            };
-
-            let promptText = `Contexte Actuel:\n${JSON.stringify(contextData)}\n`;
-            if (userMessage) promptText += `Joueur dit: "${userMessage}"\n`;
-
-            aiHistory.push({ role: "user", parts: [{ text: promptText }] });
-            if (aiHistory.length > 6) aiHistory = aiHistory.slice(aiHistory.length - 6);
-
-            const payload = {
-                systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-                contents: aiHistory,
-                generationConfig: { responseMimeType: "application/json" }
-            };
+            // Optimisation de la taille du contexte (2 souvenirs max)
+            let contextData = { evt: reason, map: generateAsciiRadar(), stamina: stamina.toFixed(0), monster: monsterState, long_term_memories: AppMemory.retrieveRelevant(userMessage || reason, 2) || "Rien." };
+            let promptText = `Ctx:${JSON.stringify(contextData)}\n${userMessage ? `J:"${userMessage}"` : ""}`;
+            
+            // Limite stricte sur la taille du prompt pour éviter les surcharges JSON ou les limites de l'API
+            if (promptText.length > 1000) promptText = promptText.substring(0, 1000) + "...";
+            
+            aiHistory.push({ role: "user", parts: [{ text: promptText }] }); 
+            // Historique limité à 4 entrées (2 allers-retours max au lieu de 6)
+            if (aiHistory.length > 4) aiHistory = aiHistory.slice(-4);
 
             try {
-                let data = null;
-                // Appel uniquement vers le modèle de production rapide 2.0-flash
                 let res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] }, contents: aiHistory, generationConfig: { responseMimeType: "application/json" } })
                 }).catch(() => null);
                 
+                if (res && res.status === 429) addChatLine("Système", "Erreur 429: Limite atteinte.", true);
                 if (res && res.ok) {
-                    data = await res.json();
-                } else if (res && res.status === 429) {
-                    addChatLine("Système", "Limite de requêtes temporairement atteinte (Erreur 429). Attendez 1 minute.", true);
-                }
-
-                if (data && data.candidates && data.candidates[0]) {
-                    const responseText = data.candidates[0].content.parts[0].text;
-                    aiHistory.push({ role: "model", parts: [{ text: responseText }] });
-                    
-                    try {
-                        let cleanJson = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
-                        const aiData = JSON.parse(cleanJson);
-                        
-                        if (aiData.message && aiData.message.trim() !== "") {
-                            addChatLine("Entité", aiData.message);
-                            AppMemory.save("L'Entité", aiData.message); 
-                        }
-                        if (aiData.actions && Array.isArray(aiData.actions)) {
-                            aiData.actions.forEach(action => executeAIAction(action));
-                        }
-                    } catch (e) {
-                        console.warn("Parse JSON IA échoué:", e);
+                    const data = await res.json();
+                    if (data?.candidates?.[0]) {
+                        const txt = data.candidates[0].content.parts[0].text; aiHistory.push({ role: "model", parts: [{ text: txt }] });
+                        try {
+                            const aiData = JSON.parse(txt.replace(/```json/gi, '').replace(/```/g, '').trim());
+                            if (aiData.message?.trim()) { addChatLine("Entité", aiData.message); AppMemory.save("L'Entité", aiData.message); }
+                            if (Array.isArray(aiData.actions)) aiData.actions.forEach(executeAIAction);
+                        } catch (e) { console.warn("JSON parse err:", e); }
                     }
                 }
-            } catch (err) {
-                console.warn("Erreur requete IA:", err);
-            }
-            
-            isAIPending = false;
-            document.getElementById('aiStatusIndicator').style.display = 'none';
+            } catch (err) { console.warn("IA err:", err); }
+            isAIPending = false; $('aiStatusIndicator').style.display = 'none';
         }
 
-        function executeAIAction(action) {
-            if (!action || !action.command) return;
-            switch (action.command) {
-                case "SET_MONSTER":
-                    const wasOff = (monsterState === 'OFF');
-                    monsterState = action.state || 'OFF';
-                    if (monsterState !== 'OFF') {
-                        monster.visible = true;
-                        monsterTargetDist = action.distance || 40;
-                        if (wasOff) {
-                            let backward = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), euler.y);
-                            monster.position.copy(camera.position).add(backward.multiplyScalar(monsterTargetDist));
-                        }
-                    } else {
-                        monster.visible = false;
-                    }
-                    break;
-                case "FLICKER_LIGHTS":
-                    flickerEndTime = performance.now() + (action.duration || 5) * 1000;
-                    break;
-                case "PLAY_SOUND":
-                    if (action.type === "SCREAM") playAudioScare();
-                    else if (action.type === "WHISPER") playAudioWhisper();
-                    break;
-                case "SPAWN_ANOMALY":
-                    let cx = Math.floor((camera.position.x + TILE_SIZE/2) / TILE_SIZE) + (action.rel_x || 0);
-                    let cz = Math.floor((camera.position.z + TILE_SIZE/2) / TILE_SIZE) + (action.rel_z || 0);
-                    dynamicAnomalies.push({cx, cz});
-                    
-                    if (dynamicAnomalies.length > 20) dynamicAnomalies.shift();
-                    
-                    const key = `${cx},${cz}`;
-                    if (activeChunks.has(key)) {
-                        const obj = activeChunks.get(key);
-                        scene.remove(obj.mesh);
-                        if (obj.light) { scene.remove(obj.light); activeLights = activeLights.filter(l => l.light !== obj.light); }
-                        activeChunks.delete(key);
-                    }
-                    generateChunk(cx, cz, key);
-                    break;
-                case "SPAWN_JOURNAL":
-                    let jcx = Math.floor((camera.position.x + TILE_SIZE/2) / TILE_SIZE) + (action.rel_x || 0);
-                    let jcz = Math.floor((camera.position.z + TILE_SIZE/2) / TILE_SIZE) + (action.rel_z || 0);
-                    
-                    if (!isWall(jcx, jcz)) {
-                        dynamicJournals.push({
-                            cx: jcx, cz: jcz,
-                            title: action.title || "Note Mystérieuse",
-                            content: action.content || "Le papier est vide...",
-                            picked: false
-                        });
-                        
-                        const jkey = `${jcx},${jcz}`;
-                        if (activeChunks.has(jkey)) {
-                            const obj = activeChunks.get(jkey);
-                            scene.remove(obj.mesh);
-                            if (obj.light) { scene.remove(obj.light); activeLights = activeLights.filter(l => l.light !== obj.light); }
-                            activeChunks.delete(jkey);
-                        }
-                        generateChunk(jcx, jcz, jkey);
-                    }
-                    break;
-                case "SHOW_MESSAGE":
-                    if (domScareMessage) {
-                        domScareMessage.innerText = action.text || "ERREUR";
-                        domScareMessage.style.opacity = 1;
-                        setTimeout(() => domScareMessage.style.opacity = 0, (action.duration || 2) * 1000);
-                    }
-                    break;
-                case "CHANGE_FOG":
-                    targetFogColor = new THREE.Color(action.color || 0x3b3319);
-                    targetFogDensity = action.density || 0.022;
-                    setTimeout(() => {
-                        targetFogColor = new THREE.Color(0x3b3319);
-                        targetFogDensity = 0.022;
-                    }, (action.duration || 10) * 1000);
-                    break;
+        function executeAIAction(a) {
+            if (!a?.command) return;
+            if (a.command === "SET_MONSTER") {
+                const wasOff = (monsterState === 'OFF'); monsterState = a.state || 'OFF';
+                if (monsterState !== 'OFF') { monster.visible = true; monsterTargetDist = a.distance || 40; if (wasOff) monster.position.copy(camera.position).add(new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), euler.y).multiplyScalar(monsterTargetDist)); } 
+                else monster.visible = false;
+            } else if (a.command === "FLICKER_LIGHTS") { flickerEndTime = performance.now() + (a.duration || 5) * 1000; } 
+            else if (a.command === "PLAY_SOUND") { a.type === "SCREAM" ? playAudioScare() : playAudioWhisper(); } 
+            else if (a.command === "SPAWN_ANOMALY" || a.command === "SPAWN_JOURNAL") {
+                let x = Math.floor((camera.position.x + TILE_SIZE/2) / TILE_SIZE) + (a.rel_x || 0), z = Math.floor((camera.position.z + TILE_SIZE/2) / TILE_SIZE) + (a.rel_z || 0), k = `${x},${z}`;
+                if (a.command === "SPAWN_ANOMALY") { dynamicAnomalies.push({cx: x, cz: z}); if (dynamicAnomalies.length > 20) dynamicAnomalies.shift(); } 
+                else if (!isWall(x, z)) dynamicJournals.push({ cx: x, cz: z, title: a.title || "Note", content: a.content || "...", picked: false });
+                if (activeChunks.has(k)) { const o = activeChunks.get(k); scene.remove(o.mesh); if (o.light) { scene.remove(o.light); activeLights = activeLights.filter(l => l.light !== o.light); } activeChunks.delete(k); }
+                generateChunk(x, z, k);
+            } else if (a.command === "SHOW_MESSAGE" && domScareMessage) {
+                domScareMessage.innerText = a.text || "ERREUR"; domScareMessage.style.opacity = 1; setTimeout(() => domScareMessage.style.opacity = 0, (a.duration || 2) * 1000);
+            } else if (a.command === "CHANGE_FOG") {
+                targetFogColor = new THREE.Color(a.color || 0x3b3319); targetFogDensity = a.density || 0.022; setTimeout(() => { targetFogColor = new THREE.Color(0x3b3319); targetFogDensity = 0.022; }, (a.duration || 10) * 1000);
             }
         }
 
-        // ==========================================
-        // CREATION DES MATERIAUX & AUDIO PROCEDURAL
-        // ==========================================
         function createMaterials() {
-            const wCanvas = document.createElement('canvas'); wCanvas.width = 256; wCanvas.height = 256;
-            const wCtx = wCanvas.getContext('2d'); wCtx.fillStyle = '#dcb95e'; wCtx.fillRect(0,0,256,256);
-            for(let i=0; i<3000; i++) { 
-                wCtx.fillStyle = Math.random()>0.5 ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.04)'; 
-                wCtx.fillRect(Math.random()*256, Math.random()*256, 2, 2); 
-            }
-            wCtx.strokeStyle = 'rgba(0,0,0,0.04)'; wCtx.lineWidth = 1;
-            for(let i=0; i<256; i+=16) { wCtx.beginPath(); wCtx.moveTo(i, 0); wCtx.lineTo(i, 256); wCtx.stroke(); }
-            const wTex = new THREE.CanvasTexture(wCanvas); wTex.wrapS = wTex.wrapT = THREE.RepeatWrapping; wTex.repeat.set(1,1);
-            wallMaterial = new THREE.MeshStandardMaterial({ map: wTex, roughness: 0.9, metalness: 0.1 });
+            const g = (w,h) => { const c=document.createElement('canvas'); c.width=w; c.height=h; return c.getContext('2d'); };
+            const wCtx = g(256,256); wCtx.fillStyle='#dcb95e'; wCtx.fillRect(0,0,256,256); for(let i=0;i<3000;i++){wCtx.fillStyle=Math.random()>.5?'rgba(0,0,0,0.03)':'rgba(255,255,255,0.04)';wCtx.fillRect(Math.random()*256,Math.random()*256,2,2);}
+            wCtx.strokeStyle='rgba(0,0,0,0.04)'; wCtx.lineWidth=1; for(let i=0;i<256;i+=16){wCtx.beginPath();wCtx.moveTo(i,0);wCtx.lineTo(i,256);wCtx.stroke();}
+            wallMaterial = new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(wCtx.canvas).clone(), roughness: 0.9, metalness: 0.1 }); wallMaterial.map.wrapS = wallMaterial.map.wrapT = THREE.RepeatWrapping;
 
-            const fCanvas = document.createElement('canvas'); fCanvas.width = 128; fCanvas.height = 128;
-            const fCtx = fCanvas.getContext('2d'); fCtx.fillStyle = '#a68d3a'; fCtx.fillRect(0,0,128,128);
-            for(let i=0; i<5000; i++) { const shade = Math.random()*40; fCtx.fillStyle = `rgba(${shade},${shade},${shade},0.12)`; fCtx.fillRect(Math.random()*128, Math.random()*128, 1, 1); }
-            const fTex = new THREE.CanvasTexture(fCanvas); fTex.wrapS = fTex.wrapT = THREE.RepeatWrapping; fTex.repeat.set(50,50);
-            floorMaterial = new THREE.MeshStandardMaterial({ map: fTex, roughness: 1.0 });
+            const fCtx = g(128,128); fCtx.fillStyle='#a68d3a'; fCtx.fillRect(0,0,128,128); for(let i=0;i<5000;i++){const s=Math.random()*40;fCtx.fillStyle=`rgba(${s},${s},${s},0.12)`;fCtx.fillRect(Math.random()*128,Math.random()*128,1,1);}
+            floorMaterial = new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(fCtx.canvas).clone(), roughness: 1.0 }); floorMaterial.map.wrapS = floorMaterial.map.wrapT = THREE.RepeatWrapping; floorMaterial.map.repeat.set(50,50);
 
-            const cCanvas = document.createElement('canvas'); cCanvas.width = 128; cCanvas.height = 128;
-            const cCtx = cCanvas.getContext('2d'); cCtx.fillStyle = '#e0e0e0'; cCtx.fillRect(0,0,128,128);
-            cCtx.strokeStyle = '#999'; cCtx.lineWidth = 2; cCtx.strokeRect(0,0,128,128);
-            for(let i=0; i<500; i++) { cCtx.fillStyle = 'rgba(0,0,0,0.04)'; cCtx.fillRect(Math.random()*128, Math.random()*128, 4, 4); }
-            const cTex = new THREE.CanvasTexture(cCanvas); cTex.wrapS = cTex.wrapT = THREE.RepeatWrapping; cTex.repeat.set(50,50);
-            ceilingMaterial = new THREE.MeshStandardMaterial({ map: cTex, roughness: 0.8, metalness: 0.05 });
+            const cCtx = g(128,128); cCtx.fillStyle='#e0e0e0'; cCtx.fillRect(0,0,128,128); cCtx.strokeStyle='#999'; cCtx.lineWidth=2; cCtx.strokeRect(0,0,128,128); for(let i=0;i<500;i++){cCtx.fillStyle='rgba(0,0,0,0.04)';cCtx.fillRect(Math.random()*128,Math.random()*128,4,4);}
+            ceilingMaterial = new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(cCtx.canvas).clone(), roughness: 0.8, metalness: 0.05 }); ceilingMaterial.map.wrapS = ceilingMaterial.map.wrapT = THREE.RepeatWrapping; ceilingMaterial.map.repeat.set(50,50);
 
-            const jCanvas = document.createElement('canvas'); jCanvas.width = 128; jCanvas.height = 128;
-            const jCtx = jCanvas.getContext('2d'); jCtx.fillStyle = '#eae2cc'; jCtx.fillRect(0,0,128,128);
-            jCtx.fillStyle = 'rgba(100,60,20,0.4)';
-            for(let i=0; i<15; i++) { jCtx.fillRect(10, 20 + i*6, 108, 2); } 
-            jCtx.strokeStyle = 'rgba(120,40,20,0.3)'; jCtx.lineWidth = 4; jCtx.strokeRect(2,2,124,124);
-            const jTex = new THREE.CanvasTexture(jCanvas);
-            journalMaterial = new THREE.MeshBasicMaterial({ map: jTex, side: THREE.DoubleSide });
+            const jCtx = g(128,128); jCtx.fillStyle='#eae2cc'; jCtx.fillRect(0,0,128,128); jCtx.fillStyle='rgba(100,60,20,0.4)'; for(let i=0;i<15;i++)jCtx.fillRect(10,20+i*6,108,2); jCtx.strokeStyle='rgba(120,40,20,0.3)'; jCtx.lineWidth=4; jCtx.strokeRect(2,2,124,124);
+            journalMaterial = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(jCtx.canvas), side: THREE.DoubleSide });
         }
 
         function initAudio() {
             if (audioCtx) return;
             try {
                 audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                
-                humOscillator = audioCtx.createOscillator(); 
-                humOscillator.type = 'sawtooth'; humOscillator.frequency.value = 55;
+                humOscillator = audioCtx.createOscillator(); humOscillator.type = 'sawtooth'; humOscillator.frequency.value = 55;
                 const lpf = audioCtx.createBiquadFilter(); lpf.type = 'lowpass'; lpf.frequency.value = 150;
-                humGain = audioCtx.createGain(); humGain.gain.value = 0.1 * masterVolume;
-                humOscillator.connect(lpf); lpf.connect(humGain); humGain.connect(audioCtx.destination); 
-                humOscillator.start();
+                humGain = audioCtx.createGain(); humGain.gain.value = 0.1 * masterVolume; humOscillator.connect(lpf).connect(humGain).connect(audioCtx.destination); humOscillator.start();
 
-                const noiseBuffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 2, audioCtx.sampleRate);
-                const output = noiseBuffer.getChannelData(0); 
-                for (let i = 0; i < output.length; i++) output[i] = Math.random() * 2 - 1;
-                noiseNode = audioCtx.createBufferSource(); noiseNode.buffer = noiseBuffer; noiseNode.loop = true;
-                const noiseFilter = audioCtx.createBiquadFilter(); noiseFilter.type = 'highpass'; noiseFilter.frequency.value = 4000;
-                noiseGain = audioCtx.createGain(); noiseGain.gain.value = 0.005 * masterVolume;
-                noiseNode.connect(noiseFilter); noiseFilter.connect(noiseGain); noiseGain.connect(audioCtx.destination); 
-                noiseNode.start();
-            } catch(e) {
-                console.warn("AudioContext non supporté", e);
-            }
+                const nBuf = audioCtx.createBuffer(1, audioCtx.sampleRate * 2, audioCtx.sampleRate), out = nBuf.getChannelData(0);
+                for (let i = 0; i < out.length; i++) out[i] = Math.random() * 2 - 1;
+                noiseNode = audioCtx.createBufferSource(); noiseNode.buffer = nBuf; noiseNode.loop = true;
+                const nFilt = audioCtx.createBiquadFilter(); nFilt.type = 'highpass'; nFilt.frequency.value = 4000;
+                noiseGain = audioCtx.createGain(); noiseGain.gain.value = 0.005 * masterVolume; noiseNode.connect(nFilt).connect(noiseGain).connect(audioCtx.destination); noiseNode.start();
+            } catch(e) {}
         }
+        function playAudioScare() { if(!audioCtx) return; const o=audioCtx.createOscillator(), g=audioCtx.createGain(); o.type='square'; o.frequency.setValueAtTime(800,audioCtx.currentTime); o.frequency.exponentialRampToValueAtTime(150,audioCtx.currentTime+.5); g.gain.setValueAtTime(.8*masterVolume,audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(.01,audioCtx.currentTime+.5); o.connect(g).connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime+.6); }
+        function playAudioWhisper() { if(!audioCtx) return; const b=audioCtx.createBuffer(1,audioCtx.sampleRate,audioCtx.sampleRate), o=b.getChannelData(0); for(let i=0;i<o.length;i++)o[i]=(Math.random()*2-1)*.5; const s=audioCtx.createBufferSource(), bp=audioCtx.createBiquadFilter(), g=audioCtx.createGain(); s.buffer=b; bp.type='bandpass'; bp.frequency.value=1000; g.gain.setValueAtTime(.3*masterVolume,audioCtx.currentTime); g.gain.linearRampToValueAtTime(0,audioCtx.currentTime+1); s.connect(bp).connect(g).connect(audioCtx.destination); s.start(); }
 
-        function playAudioScare() {
-            if (!audioCtx) return;
-            const osc = audioCtx.createOscillator();
-            osc.type = 'square'; osc.frequency.setValueAtTime(800, audioCtx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(150, audioCtx.currentTime + 0.5);
-            const gain = audioCtx.createGain(); gain.gain.setValueAtTime(0.8 * masterVolume, audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
-            osc.connect(gain); gain.connect(audioCtx.destination);
-            osc.start(); osc.stop(audioCtx.currentTime + 0.6);
-        }
-
-        function playAudioWhisper() {
-            if (!audioCtx) return;
-            const buf = audioCtx.createBuffer(1, audioCtx.sampleRate, audioCtx.sampleRate);
-            const out = buf.getChannelData(0);
-            for (let i = 0; i < out.length; i++) out[i] = (Math.random() * 2 - 1) * 0.5;
-            const src = audioCtx.createBufferSource(); src.buffer = buf;
-            const bp = audioCtx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1000;
-            const gain = audioCtx.createGain(); gain.gain.setValueAtTime(0.3 * masterVolume, audioCtx.currentTime);
-            gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 1);
-            src.connect(bp); bp.connect(gain); gain.connect(audioCtx.destination);
-            src.start();
-        }
-
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight; 
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-
-        // ==========================================
-        // BOUCLE PRINCIPALE DE JEU (GAMELOOP OPTIMISÉE)
-        // ==========================================
         function animate() {
             requestAnimationFrame(animate);
-            const time = performance.now();
-            const delta = Math.min((time - prevTime) / 1000, 0.1); 
-            prevTime = time;
+            const time = performance.now(), delta = Math.min((time - prevTime) / 1000, 0.1); prevTime = time;
 
             if (controlsEnabled && !isDead) {
-                if (!startTime) startTime = time;
-                let el = time - startTime;
+                if (!startTime) startTime = time; let el = time - startTime;
                 if (domVhsTime) domVhsTime.innerText = `PLAY ▶ ${String(Math.floor(el/3600000)).padStart(2,'0')}:${String(Math.floor(el/60000)%60).padStart(2,'0')}:${String(Math.floor(el/1000)%60).padStart(2,'0')}`;
 
+                let isMoving = (moveForward || moveBackward || moveLeft || moveRight);
                 if (!isChatMode) {
-                    velocity.x -= velocity.x * 10.0 * delta; 
-                    velocity.z -= velocity.z * 10.0 * delta;
+                    velocity.x -= velocity.x * 10.0 * delta; velocity.z -= velocity.z * 10.0 * delta;
+                    if (stamina <= 0) isExhausted = true; if (stamina > 30) isExhausted = false;
                     
-                    let cSpeed = WALK_SPEED;
+                    if (isRunning && !isExhausted && isMoving) stamina = Math.max(0, stamina - delta * 25);
+                    else stamina = Math.min(maxStamina, stamina + delta * 15);
                     
-                    if (stamina <= 0) isExhausted = true;
-                    if (stamina > 30) isExhausted = false;
+                    if (domStaminaBar) { domStaminaBar.style.width = stamina + '%'; domStaminaBar.style.backgroundColor = (stamina < 25 || isExhausted) ? '#f33' : '#dcb95e'; }
 
-                    if (isRunning && !isExhausted && (moveForward || moveBackward || moveLeft || moveRight)) {
-                        cSpeed = RUN_SPEED; 
-                        stamina = Math.max(0, stamina - delta * 25);
-                    } else {
-                        stamina = Math.min(maxStamina, stamina + delta * 15);
+                    if (isMoving) { 
+                        let dir = new THREE.Vector3(Number(moveRight) - Number(moveLeft), 0, Number(moveBackward) - Number(moveForward)).normalize().applyAxisAngle(new THREE.Vector3(0,1,0), euler.y);
+                        let s = (isRunning && !isExhausted) ? RUN_SPEED : WALK_SPEED;
+                        velocity.x -= dir.x * s * delta; velocity.z -= dir.z * s * delta; 
                     }
-                    
-                    if (domStaminaBar) {
-                        domStaminaBar.style.width = stamina + '%'; 
-                        domStaminaBar.style.backgroundColor = (stamina < 25 || isExhausted) ? '#ff3333' : '#dcb95e';
-                    }
+                } else { velocity.x = 0; velocity.z = 0; isMoving = false; }
 
-                    let dir = new THREE.Vector3(
-                        Number(moveRight) - Number(moveLeft), 
-                        0, 
-                        Number(moveBackward) - Number(moveForward)
-                    ).normalize().applyAxisAngle(new THREE.Vector3(0,1,0), euler.y);
-                    
-                    if (moveForward || moveBackward || moveLeft || moveRight) { 
-                        velocity.x -= dir.x * cSpeed * delta; 
-                        velocity.z -= dir.z * cSpeed * delta; 
-                    }
-                } else {
-                    velocity.x = 0; velocity.z = 0;
-                }
-
-                if (!checkCollision(camera.position.x - velocity.x * delta, camera.position.z)) {
-                    camera.position.x -= velocity.x * delta;
-                }
-                if (!checkCollision(camera.position.x, camera.position.z - velocity.z * delta)) {
-                    camera.position.z -= velocity.z * delta;
-                }
+                if (!checkCollision(camera.position.x - velocity.x * delta, camera.position.z)) camera.position.x -= velocity.x * delta;
+                if (!checkCollision(camera.position.x, camera.position.z - velocity.z * delta)) camera.position.z -= velocity.z * delta;
+                
+                // Headbobbing retiré : caméra fixe à la hauteur du joueur
                 camera.position.y = PLAYER_HEIGHT;
+
+                // NOVEAUTÉ : FOV Dynamique (Champ de vision augmente quand on sprint)
+                const targetFov = (isRunning && !isExhausted && isMoving) ? 95 : 85;
+                if (Math.abs(camera.fov - targetFov) > 0.5) { camera.fov += (targetFov - camera.fov) * 0.1; camera.updateProjectionMatrix(); }
 
                 flashLight.position.set(Math.sin(time*0.002)*0.15, Math.cos(time*0.0015)*0.15, 0);
 
                 if (monsterState !== 'OFF' && monster) {
-                    const dx = camera.position.x - monster.position.x;
-                    const dz = camera.position.z - monster.position.z;
-                    const dist = Math.sqrt(dx*dx + dz*dz);
-                    
-                    monsterParticles.forEach(p => {
-                        p.phase += delta * p.speed;
-                        p.mesh.position.set(
-                            p.offsetX + Math.sin(p.phase)*1.8, 
-                            p.offsetY + Math.cos(p.phase*0.8)*1.5, 
-                            p.offsetZ + Math.sin(p.phase*1.2)*1.8
-                        );
-                        const s = 1 + Math.sin(p.phase*0.5)*0.25; 
-                        p.mesh.scale.set(s,s,s);
-                    });
-
+                    const dx = camera.position.x - monster.position.x, dz = camera.position.z - monster.position.z, dist = Math.hypot(dx, dz);
+                    monsterParticles.forEach(p => { p.phase += delta * p.speed; p.mesh.position.set(p.offsetX + Math.sin(p.phase)*1.8, p.offsetY + Math.cos(p.phase*0.8)*1.5, p.offsetZ + Math.sin(p.phase*1.2)*1.8); const s = 1 + Math.sin(p.phase*0.5)*0.25; p.mesh.scale.set(s,s,s); });
                     let ms = isRunning ? 16.0 : 11.0;
-                    
-                    if (monsterState === 'ATTACK') {
-                        if (dist > 2.5) {
-                            monster.position.x += (dx/dist)*ms*delta; 
-                            monster.position.z += (dz/dist)*ms*delta;
-                        } else {
-                            triggerDeath("L'Entité vous a consumé.");
-                        }
-                    } else if (monsterState === 'STALKER') {
-                        if (dist > monsterTargetDist + 5) {
-                            monster.position.x += (dx/dist)*ms*0.5*delta; 
-                            monster.position.z += (dz/dist)*ms*0.5*delta;
-                        } else if (dist < monsterTargetDist - 5) {
-                            monster.position.x -= (dx/dist)*ms*delta; 
-                            monster.position.z -= (dz/dist)*ms*delta;
-                        }
-                    }
-                    
+                    if (monsterState === 'ATTACK') { if (dist > 2.5) { monster.position.x += (dx/dist)*ms*delta; monster.position.z += (dz/dist)*ms*delta; } else triggerDeath("L'Entité vous a consumé."); } 
+                    else if (monsterState === 'STALKER') { if (dist > monsterTargetDist + 5) { monster.position.x += (dx/dist)*ms*0.5*delta; monster.position.z += (dz/dist)*ms*0.5*delta; } else if (dist < monsterTargetDist - 5) { monster.position.x -= (dx/dist)*ms*delta; monster.position.z -= (dz/dist)*ms*delta; } }
                     monster.position.y = Math.sin(time*0.001)*0.4;
-                    
-                    if (dist < 40) {
-                        const intensity = 1 - (dist / 40);
-                        scene.background.lerpColors(targetFogColor, new THREE.Color(0x000000), intensity);
-                    }
+                    if (dist < 40) scene.background.lerpColors(targetFogColor, new THREE.Color(0x000000), 1 - (dist / 40));
                 }
 
-                scene.background.lerp(targetFogColor, 0.05); 
-                scene.fog.color.copy(scene.background);
-                scene.fog.density += (targetFogDensity - scene.fog.density) * 0.05;
-                if(targetFogColor.r > 0.5 && domVignette) {
-                    domVignette.style.background = 'radial-gradient(circle, rgba(255,0,0,0) 30%, rgba(100,0,0,0.95) 100%)';
-                } else if(domVignette) {
-                    domVignette.style.background = 'radial-gradient(circle, rgba(0,0,0,0) 30%, rgba(0,0,0,0.95) 100%)';
-                }
+                scene.background.lerp(targetFogColor, 0.05); scene.fog.color.copy(scene.background); scene.fog.density += (targetFogDensity - scene.fog.density) * 0.05;
+                if(domVignette) domVignette.style.background = targetFogColor.r > 0.5 ? 'radial-gradient(circle, rgba(255,0,0,0) 30%, rgba(100,0,0,0.95) 100%)' : 'radial-gradient(circle, rgba(0,0,0,0) 30%, rgba(0,0,0,0.95) 100%)';
 
                 for (const [key, obj] of activeChunks.entries()) {
                     if (obj.anomaly) {
-                        obj.anomaly.rotation.y += delta * 0.5; obj.anomaly.rotation.x += delta * 0.2;
-                        obj.anomaly.position.y = (WALL_HEIGHT/2) + Math.sin(time*0.002 + obj.anomaly.rotation.y)*1.5;
-                        const d = Math.sqrt(Math.pow(camera.position.x - obj.mesh.position.x, 2) + Math.pow(camera.position.z - obj.mesh.position.z, 2));
-                        
-                        if (d < 15 && !firstAnomalySeen) {
-                            firstAnomalySeen = true; triggerAI("Le joueur approche d'une anomalie mortelle.");
-                        }
+                        obj.anomaly.rotation.y += delta * 0.5; obj.anomaly.rotation.x += delta * 0.2; obj.anomaly.position.y = (WALL_HEIGHT/2) + Math.sin(time*0.002 + obj.anomaly.rotation.y)*1.5;
+                        const d = Math.hypot(camera.position.x - obj.mesh.position.x, camera.position.z - obj.mesh.position.z);
+                        if (d < 15 && !firstAnomalySeen) { firstAnomalySeen = true; triggerAI("Le joueur approche d'une anomalie mortelle."); }
                         if (d < 3.5) triggerDeath("Un vide absolu a absorbé votre conscience.");
                     }
                 }
-
-                updateChunks();
-                updateInteractPrompt(); 
+                updateChunks(); updateInteractPrompt();
                 
-                if (audioCtx && humGain && noiseGain) {
-                    humGain.gain.value = (0.1 + Math.sin(time*0.001)*0.02) * masterVolume;
-                    if (Math.random() < 0.05) noiseGain.gain.value = (0.005 + Math.random()*0.02) * masterVolume;
-                    else noiseGain.gain.value += ((0.002 * masterVolume) - noiseGain.gain.value) * 0.1;
-                }
-
-                if (geminiApiKey && !isAIPending && time - lastAITriggerTime > 45000) {
-                    triggerAI("Routine d'ambiance. Le joueur marche depuis un moment. Fais quelque chose pour casser la monotonie ou sers-toi de ses souvenirs.");
-                }
+                if (audioCtx && humGain && noiseGain) { humGain.gain.value = (0.1 + Math.sin(time*0.001)*0.02) * masterVolume; if (Math.random() < 0.05) noiseGain.gain.value = (0.005 + Math.random()*0.02) * masterVolume; else noiseGain.gain.value += ((0.002 * masterVolume) - noiseGain.gain.value) * 0.1; }
+                if (geminiApiKey && !isAIPending && time - lastAITriggerTime > 45000) triggerAI("Routine d'ambiance. Le joueur marche depuis un moment.");
             }
 
             const isFlickering = time < flickerEndTime;
             activeLights.forEach(ld => {
                 if (!ld.light) return;
-                
-                let dMonster = 9999;
-                if (monsterState !== 'OFF' && monster) {
-                    dMonster = Math.sqrt(Math.pow(ld.cx*TILE_SIZE - monster.position.x, 2) + Math.pow(ld.cz*TILE_SIZE - monster.position.z, 2));
-                }
-                if (dMonster < 38) ld.extinguished = true;
-
+                if (monsterState !== 'OFF' && monster && Math.hypot(ld.cx*TILE_SIZE - monster.position.x, ld.cz*TILE_SIZE - monster.position.z) < 38) ld.extinguished = true;
                 if (ld.extinguished) { ld.light.intensity = 0; return; }
                 if (ld.isAnomaly) { ld.light.intensity = 1.0 + Math.sin(time*0.003)*0.5; return; }
                 if (ld.isJournal) { ld.light.intensity = 0.4 + Math.sin(time*0.005)*0.2; return; } 
-
-                if (isFlickering) {
-                    ld.light.intensity = Math.random() > 0.5 ? 0 : (0.2 + Math.random()*0.6);
-                } else {
-                    if (Math.random() < 0.02) ld.light.intensity = 0.2 + Math.random()*0.5;
-                    else ld.light.intensity += (0.8 - ld.light.intensity) * 0.1;
-                }
+                if (isFlickering) ld.light.intensity = Math.random() > 0.5 ? 0 : (0.2 + Math.random()*0.6); else { if (Math.random() < 0.02) ld.light.intensity = 0.2 + Math.random()*0.5; else ld.light.intensity += (0.8 - ld.light.intensity) * 0.1; }
             });
-
             renderer.render(scene, camera);
         }
 
         function triggerDeath(reasonText = "Le brouillard noir a étouffé votre réalité.") {
-            if (isDead) return;
-            isDead = true; controlsEnabled = false; 
-            document.exitPointerLock();
-            
-            if (domDeathScreen) {
-                document.getElementById('deathReason').innerText = reasonText;
-                domDeathScreen.classList.remove('hidden'); 
-                domDeathScreen.style.opacity = 1; 
-                domDeathScreen.style.pointerEvents = 'auto';
-            }
-            
-            if (domStaminaContainer) domStaminaContainer.style.display = 'none';
-            if (domVhsOverlay) domVhsOverlay.style.display = 'none';
-            if (domChatInterface) domChatInterface.style.display = 'none';
-            if (domScareMessage) domScareMessage.style.display = 'none';
-            if (domInteractPrompt) domInteractPrompt.style.display = 'none';
-            
-            if (humGain) humGain.gain.value = 0; 
-            if (noiseGain) noiseGain.gain.value = 0;
-            
+            if (isDead) return; isDead = true; controlsEnabled = false; document.exitPointerLock();
+            if (domDeathScreen) { $('deathReason').innerText = reasonText; domDeathScreen.classList.remove('hidden'); domDeathScreen.style.opacity = 1; domDeathScreen.style.pointerEvents = 'auto'; }
+            if (domStaminaContainer) domStaminaContainer.style.display = 'none'; if (domVhsOverlay) domVhsOverlay.style.display = 'none'; if (domChatInterface) domChatInterface.style.display = 'none'; if (domScareMessage) domScareMessage.style.display = 'none'; if (domInteractPrompt) domInteractPrompt.style.display = 'none';
+            if (humGain) humGain.gain.value = 0; if (noiseGain) noiseGain.gain.value = 0;
             triggerAI("Le joueur vient de mourir.");
         }
     </script>
