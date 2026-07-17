@@ -117,7 +117,7 @@
         let prevTime = performance.now();
         const velocity = new THREE.Vector3(), euler = new THREE.Euler(0, 0, 0, 'YXZ'), playerPos = new THREE.Vector3(0, PLAYER_HEIGHT, 0);
 
-        let mouseSensitivity = 0.002, baseSensitivity = 0.002, masterVolume = 0.5, isDead = false, stamina = 100, maxStamina = 100, isExhausted = false, startTime = null, bobTimer = 0; // Ajout de bobTimer pour le headbobbing
+        let mouseSensitivity = 0.002, baseSensitivity = 0.002, masterVolume = 0.5, isDead = false, stamina = 100, maxStamina = 100, isExhausted = false, startTime = null;
         const activeChunks = new Map();
         let activeLights = [], dynamicAnomalies = [], dynamicJournals = []; 
         let wallMaterial, floorMaterial, ceilingMaterial, journalMaterial, audioCtx, humOscillator, noiseNode, humGain, noiseGain, monster, flashLight, monsterParticles = [];
@@ -186,15 +186,29 @@ Format attendu: { "message": "Texte...", "actions": [ { "command": "..." } ] }`;
         async function checkApiKeyValid(key) {
             try {
                 const payload = { contents: [{ role: "user", parts: [{ text: "Dis juste le mot OK." }] }] };
-                const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
-                }, 5000).catch(() => null);
+                let res = null;
+                let retries = 0;
+                let delay = 1000;
+                
+                while(retries < 3) {
+                    res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${key}`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+                    }, 5000).catch(() => null);
+                    
+                    if (res && res.status === 429) {
+                        retries++;
+                        await new Promise(r => setTimeout(r, delay));
+                        delay *= 2;
+                    } else {
+                        break;
+                    }
+                }
 
                 if (!res) return { valid: false, reason: "Impossible de joindre Google." };
                 if (res.ok) return { valid: true };
                 
-                // Contournement robuste : On valide la clé même en cas de 429 ou 400 (faux positifs fréquents de l'API)
-                if (res.status === 429 || res.status === 400) return { valid: true, warning: true, reason: "Clé acceptée (Bypass Erreur " + res.status + ")." };
+                // Contournement pour les faux positifs de l'API (Rate Limit ou Bad Request sur le test basique)
+                if (res.status === 429 || res.status === 400) return { valid: true, warning: true, reason: `Clé acceptée (Bypass Erreur ${res.status}).` };
                 if (res.status === 401) return { valid: false, reason: "Clé non autorisée (Erreur 401)." };
                 
                 return { valid: false, reason: `Erreur API Google (${res.status}).` };
@@ -398,41 +412,61 @@ Format attendu: { "message": "Texte...", "actions": [ { "command": "..." } ] }`;
             if (!geminiApiKey) { if (userMessage) addChatLine("Système", "IA indisponible.", true); return; }
             if (isAIPending) return;
             
-            // Sécurité anti-spam et limite de tokens
+            // Sécurisation des entrées
             reason = String(reason || "").substring(0, 100);
             userMessage = String(userMessage || "").substring(0, 150);
             
             isAIPending = true; lastAITriggerTime = performance.now(); $('aiStatusIndicator').style.display = 'block';
 
-            // Optimisation de la taille du contexte (2 souvenirs max)
             let contextData = { evt: reason, map: generateAsciiRadar(), stamina: stamina.toFixed(0), monster: monsterState, long_term_memories: AppMemory.retrieveRelevant(userMessage || reason, 2) || "Rien." };
             let promptText = `Ctx:${JSON.stringify(contextData)}\n${userMessage ? `J:"${userMessage}"` : ""}`;
             
-            // Limite stricte sur la taille du prompt pour éviter les surcharges JSON ou les limites de l'API
-            if (promptText.length > 1000) promptText = promptText.substring(0, 1000) + "...";
+            // Limite stricte de sécurité
+            if (promptText.length > 2500) promptText = promptText.substring(0, 2500) + "...";
             
             aiHistory.push({ role: "user", parts: [{ text: promptText }] }); 
-            // Historique limité à 4 entrées (2 allers-retours max au lieu de 6)
             if (aiHistory.length > 4) aiHistory = aiHistory.slice(-4);
 
             try {
-                let res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] }, contents: aiHistory, generationConfig: { responseMimeType: "application/json" } })
-                }).catch(() => null);
+                let res = null;
+                let retries = 0;
+                let delay = 1000;
                 
-                if (res && res.status === 429) addChatLine("Système", "Erreur 429: Limite atteinte.", true);
+                while (retries < 4) {
+                    res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${geminiApiKey}`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] }, contents: aiHistory, generationConfig: { responseMimeType: "application/json" } })
+                    }).catch(() => null);
+                    
+                    if (res && res.status === 429) {
+                        retries++;
+                        if (retries >= 4) {
+                            addChatLine("Système", "L'Entité rassemble ses forces... (Réseau encombré)", true);
+                            break;
+                        }
+                        await new Promise(r => setTimeout(r, delay));
+                        delay *= 2;
+                    } else {
+                        break;
+                    }
+                }
+                
                 if (res && res.ok) {
                     const data = await res.json();
                     if (data?.candidates?.[0]) {
                         const txt = data.candidates[0].content.parts[0].text; aiHistory.push({ role: "model", parts: [{ text: txt }] });
                         try {
-                            const aiData = JSON.parse(txt.replace(/```json/gi, '').replace(/```/g, '').trim());
+                            // Extraction robuste du JSON
+                            let jsonStr = txt;
+                            const jsonMatch = txt.match(/\{[\s\S]*\}/);
+                            if (jsonMatch) jsonStr = jsonMatch[0];
+
+                            const aiData = JSON.parse(jsonStr.replace(/```json/gi, '').replace(/```/g, '').trim());
                             if (aiData.message?.trim()) { addChatLine("Entité", aiData.message); AppMemory.save("L'Entité", aiData.message); }
                             if (Array.isArray(aiData.actions)) aiData.actions.forEach(executeAIAction);
-                        } catch (e) { console.warn("JSON parse err:", e); }
+                        } catch (e) { console.error("Erreur de parsing AI:", e); }
                     }
                 }
-            } catch (err) { console.warn("IA err:", err); }
+            } catch (err) { console.error("Erreur réseau AI:", err); }
             isAIPending = false; $('aiStatusIndicator').style.display = 'none';
         }
 
@@ -519,10 +553,8 @@ Format attendu: { "message": "Texte...", "actions": [ { "command": "..." } ] }`;
                 if (!checkCollision(camera.position.x - velocity.x * delta, camera.position.z)) camera.position.x -= velocity.x * delta;
                 if (!checkCollision(camera.position.x, camera.position.z - velocity.z * delta)) camera.position.z -= velocity.z * delta;
                 
-                // Headbobbing retiré : caméra fixe à la hauteur du joueur
                 camera.position.y = PLAYER_HEIGHT;
 
-                // NOVEAUTÉ : FOV Dynamique (Champ de vision augmente quand on sprint)
                 const targetFov = (isRunning && !isExhausted && isMoving) ? 95 : 85;
                 if (Math.abs(camera.fov - targetFov) > 0.5) { camera.fov += (targetFov - camera.fov) * 0.1; camera.updateProjectionMatrix(); }
 
